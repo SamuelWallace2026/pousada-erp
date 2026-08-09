@@ -108,7 +108,7 @@ export default function App() {
 
       {abaAtiva === 'dashboard' && (
         <div>
-          <h1 style={{ color: '#2c3e50', marginTop: 0 }}>Dashboard da Pousada</h1>
+          <h1 style={{ color: '#2c3e50', marginTop: 0 }}>Dashboard da Pousada - Sistema da Equipe</h1>
           <p style={{ color: '#7f8c8d', marginBottom: '2rem' }}>Resumo em tempo real da operação.</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem' }}>
             <div style={{ border: '1px solid #e1e8ed', padding: '1.5rem', borderRadius: '12px', backgroundColor: '#fff', borderLeft: '6px solid #3498db', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
