@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Tabela de Quartos
+model Quarto {
+  id          String    @id @default(uuid())
+  numero      String    @unique
+  capacidade  Int
+  valorDiaria Float
+  status      String    @default("LIVRE")
+  reservas    Reserva[] // Relação: Um quarto pode ter várias reservas
+}
+
+// Tabela de Hóspedes
+model Hospede {
+  id        String    @id @default(uuid())
+  nome      String
+  cpf       String    @unique
+  email     String?
+  telefone  String
+  reservas  Reserva[] // Relação: Um hóspede pode ter várias reservas
+  createdAt DateTime  @default(now())
+}
+
+// Tabela de Reservas
+model Reserva {
+  id           String   @id @default(uuid())
+  hospedeId    String
+  quartoId     String
+  dataCheckIn  DateTime
+  dataCheckOut DateTime
+  status       String   @default("CONFIRMADA")
+  
+  // Ligações (Foreign Keys)
+  hospede      Hospede  @relation(fields: [hospedeId], references: [id])
+  quarto       Quarto   @relation(fields: [quartoId], references: [id])
+  
+  createdAt    DateTime @default(now())
+}
