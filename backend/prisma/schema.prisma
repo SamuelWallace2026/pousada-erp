@@ -41,5 +41,56 @@ model Reserva {
   hospede      Hospede  @relation(fields: [hospedeId], references: [id])
   quarto       Quarto   @relation(fields: [quartoId], references: [id])
   
+  // --- NOVAS LIGAÇÕES ---
+  consumos     Consumo[]
+  transacoes   Transacao[]
+  
   createdAt    DateTime @default(now())
+}
+
+// --- NOVOS MÓDULOS ---
+
+// 1. Tabela para o Login (Etapa 1)
+model Usuario {
+  id        String   @id @default(uuid())
+  nome      String
+  email     String   @unique
+  senha     String   
+  perfil    String   // Ex: "GERENTE" ou "RECEPCIONISTA"
+  criadoEm  DateTime @default(now())
+}
+
+// 2. Tabela do Cardápio/Frigobar (Etapa 2)
+model Produto {
+  id        String    @id @default(uuid())
+  nome      String
+  preco     Float
+  estoque   Int       @default(0)
+  consumos  Consumo[]
+}
+
+// 3. Tabela que vincula o Produto consumido à Reserva do cliente (Etapa 2)
+model Consumo {
+  id          String   @id @default(uuid())
+  quantidade  Int
+  subtotal    Float    
+  criadoEm    DateTime @default(now())
+
+  reservaId   String
+  reserva     Reserva  @relation(fields: [reservaId], references: [id])
+  produtoId   String
+  produto     Produto  @relation(fields: [produtoId], references: [id])
+}
+
+// 4. Tabela do Fluxo de Caixa Diário (Sua Etapa - Etapa 3)
+model Transacao {
+  id              String   @id @default(uuid())
+  tipo            String   // Ex: "ENTRADA" ou "SAIDA"
+  valor           Float
+  metodoPagamento String   // Ex: "PIX", "CARTAO", "DINHEIRO"
+  descricao       String   
+  criadoEm        DateTime @default(now())
+
+  reservaId       String?
+  reserva         Reserva? @relation(fields: [reservaId], references: [id])
 }
