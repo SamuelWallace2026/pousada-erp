@@ -91,6 +91,37 @@ app.put('/api/reservas/:id/checkout', async (req: Request, res: Response) => {
   res.json({ message: 'Check-out realizado com sucesso!' });
 });
 
+// ==========================================
+  // ROTAS DO FINANCEIRO (CAIXA) - ETAPA 3
+  // ==========================================
+  
+  // 1. Buscar todas as transações do dia/histórico
+  app.get('/api/transacoes', async (req, res) => {
+    const transacoes = await prisma.transacao.findMany({
+      orderBy: { criadoEm: 'desc' } // Traz as mais recentes primeiro
+    });
+    res.json(transacoes);
+  });
+
+  // 2. Criar uma nova transação (Entrada ou Saída)
+  app.post('/api/transacoes', async (req, res) => {
+    const { tipo, valor, metodoPagamento, descricao } = req.body;
+    
+    try {
+      const transacao = await prisma.transacao.create({
+        data: {
+          tipo,
+          valor: Number(valor),
+          metodoPagamento,
+          descricao
+        }
+      });
+      res.status(201).json(transacao);
+    } catch (error) {
+      res.status(500).json({ error: 'Erro ao registrar transação no caixa.' });
+    }
+  });
+
 const PORT = 3333;
 app.listen(PORT, () => {
   console.log(`Servidor da Pousada rodando na porta ${PORT} 🚀`);
