@@ -14,7 +14,7 @@ model Quarto {
   capacidade  Int
   valorDiaria Float
   status      String    @default("LIVRE")
-  categoria   String    @default("Padrão") // Nova coluna
+  categoria   String    @default("Padrão")
   reservas    Reserva[]
 }
 
@@ -37,28 +37,34 @@ model Reserva {
   dataCheckIn  DateTime
   dataCheckOut DateTime
   status       String   @default("CONFIRMADA")
-  origem       String   @default("Direto") // Nova coluna
+  origem       String   @default("Direto")
   
   hospede      Hospede  @relation(fields: [hospedeId], references: [id])
   quarto       Quarto   @relation(fields: [quartoId], references: [id])
   
   consumos     Consumo[]
   transacoes   Transacao[]
+  usuarios     Usuario[] // <--- ADICIONADO AQUI PARA RESOLVER A RELAÇÃO DO PRISMA
   
   createdAt    DateTime @default(now())
 }
 
-// 1. Tabela para o Login (Etapa 1)
+// 1. Tabela para o Login 
 model Usuario {
-  id       String   @id @default(uuid())
-  nome     String
-  email    String   @unique
-  senha    String   
-  perfil   String   
-  criadoEm DateTime @default(now())
+  id        String   @id @default(uuid())
+  nome      String
+  email     String   @unique
+  senha     String   
+  cargo     String   // 'GERENTE', 'RECEPCAO', 'COZINHA', 'HOSPEDE'
+  
+  // Se for hóspede, podemos vincular opcionalmente à reserva dele
+  reservaId String?  
+  reserva   Reserva? @relation(fields: [reservaId], references: [id], onDelete: SetNull)
+
+  criadoEm  DateTime @default(now())  
 }
 
-// 2. Tabela do Cardápio/Frigobar (Etapa 2)
+// 2. Tabela do Cardápio/Frigobar
 model Produto {
   id       String    @id @default(uuid())
   nome     String
@@ -67,7 +73,7 @@ model Produto {
   consumos Consumo[]
 }
 
-// 3. Tabela que vincula o Produto consumido à Reserva do cliente (Etapa 2)
+// 3. Tabela que vincula o Produto consumido à Reserva do cliente
 model Consumo {
   id         String   @id @default(uuid())
   quantidade Int
@@ -80,7 +86,7 @@ model Consumo {
   produto    Produto  @relation(fields: [produtoId], references: [id])
 }
 
-// 4. Tabela do Fluxo de Caixa Diário (Sua Etapa - Etapa 3)
+// 4. Tabela do Fluxo de Caixa Diário
 model Transacao {
   id              String   @id @default(uuid())
   tipo            String   

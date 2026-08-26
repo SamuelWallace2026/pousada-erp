@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Users, BedDouble, UserPlus, List, DoorOpen, CalendarCheck, Activity, Key, Lock, Utensils } from 'lucide-react';
+import { Users, BedDouble, UserPlus, List, DoorOpen, CalendarCheck, Activity, Key, Lock, Utensils, ShoppingBag } from 'lucide-react';
 import { gerarReciboPdf, type MockReserva, type MockConsumo } from './utils/gerarReciboPdf'; 
 
 interface Hospede { id: string; nome: string; cpf: string; email: string; telefone: string; }
@@ -11,9 +11,13 @@ interface Transacao { id: string; tipo: string; valor: number; metodoPagamento: 
 
 export default function App() {
   const [autenticado, setAutenticado] = useState(false);
+  const [usuarioLogado, setUsuarioLogado] = useState<any>(null);
+  
+  // Inputs de Login por E-mail e Senha
+  const [emailInput, setEmailInput] = useState('');
   const [senhaInput, setSenhaInput] = useState('');
 
-  const [abaAtiva, setAbaAtiva] = useState<'dashboard' | 'hospedes' | 'quartos' | 'reservas' | 'restaurante' | 'caixa'>('dashboard');
+  const [abaAtiva, setAbaAtiva] = useState<'dashboard' | 'hospedes' | 'quartos' | 'reservas' | 'restaurante' | 'caixa' | 'portal-hospede'>('dashboard');
   
   const [hospedes, setHospedes] = useState<Hospede[]>([]);
   const [quartos, setQuartos] = useState<Quarto[]>([]);
@@ -56,7 +60,7 @@ export default function App() {
       if (abaAtiva === 'hospedes') buscarHospedes();
       if (abaAtiva === 'quartos') buscarQuartos();
       if (abaAtiva === 'reservas') { buscarHospedes(); buscarQuartos(); buscarReservas(); }
-      if (abaAtiva === 'restaurante') { buscarProdutos(); buscarReservas(); }
+      if (abaAtiva === 'restaurante' || abaAtiva === 'portal-hospede') { buscarProdutos(); buscarReservas(); }
       if (abaAtiva === 'caixa') buscarTransacoes();
       if (abaAtiva === 'dashboard') { buscarHospedes(); buscarQuartos(); buscarReservas(); }
     }
@@ -66,10 +70,25 @@ export default function App() {
   const mascaraTelefone = (valor: string) => valor.replace(/\D/g, '').replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2').replace(/(-\d{4})\d+?$/, '$1');
   const formatarMoeda = (valor: number) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-  const handleLogin = (e: React.FormEvent) => {
+  // LOGIN INTELIGENTE COM A API DO BACK-END
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (senhaInput === 'refugio123') setAutenticado(true);
-    else { alert('Senha incorreta! Tente novamente.'); setSenhaInput(''); }
+    try {
+      const response = await axios.post('http://localhost:3333/api/login', { email: emailInput, senha: senhaInput });
+      const user = response.data;
+      setUsuarioLogado(user);
+      setAutenticado(true);
+
+      // Redireciona para a aba inicial correta dependendo do cargo
+      if (user.cargo === 'GERENTE') setAbaAtiva('dashboard');
+      else if (user.cargo === 'RECEPCAO') setAbaAtiva('reservas');
+      else if (user.cargo === 'COZINHA') setAbaAtiva('restaurante');
+      else if (user.cargo === 'HOSPEDE') setAbaAtiva('portal-hospede');
+
+    } catch (error) {
+      alert('E-mail ou senha incorretos! Verifique suas credenciais.');
+      setSenhaInput('');
+    }
   };
 
   const cadastrarHospede = async (e: React.FormEvent) => { e.preventDefault(); await axios.post('http://localhost:3333/api/hospedes', { nome, cpf, email, telefone }); alert('Hóspede salvo!'); setNome(''); setCpf(''); setEmail(''); setTelefone(''); buscarHospedes(); };
@@ -90,7 +109,7 @@ export default function App() {
     e.preventDefault();
     try {
       await axios.post('http://localhost:3333/api/produtos', { nome: prodNome, preco: Number(prodPreco), estoque: Number(prodEstoque) });
-      alert('Item adicionado ao cardápio do Restaurante Dengo!');
+      alert('Item adicionado ao cardápio pelo Cozinheiro!');
       setProdNome(''); setProdPreco(''); setProdEstoque('');
       buscarProdutos();
     } catch (error) { alert('Erro ao cadastrar produto.'); }
@@ -103,6 +122,22 @@ export default function App() {
       alert('Consumo lançado na conta do hóspede com sucesso! 🍹');
       setReservaConsumoId(''); setProdutoConsumoId(''); setQtdConsumo('1');
     } catch (error) { alert('Erro ao lançar consumo.'); }
+  };
+
+  // Pedido feito diretamente pelo Hóspede logado no Portal dele
+  const pedirComoHospede = async (produtoId: string) => {
+    if (!usuarioLogado.reservaId) {
+      alert('Aviso: Sua conta de hóspede não está vinculada a nenhuma reserva ativa no momento.');
+      return;
+    }
+    try {
+      await axios.post('http://localhost:3333/api/consumos', { 
+        reservaId: usuarioLogado.reservaId, 
+        produtoId, 
+        quantidade: 1 
+      });
+      alert('Pedido realizado com sucesso! O item foi debitado na conta do seu chalé. 🛎️🍹');
+    } catch (error) { alert('Erro ao registrar pedido.'); }
   };
 
   const fazerCheckout = async (reservaId: string) => {
@@ -118,7 +153,6 @@ export default function App() {
     const qtdDiarias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) || 1;
     const totalDiarias = qtdDiarias * reserva.quarto.valorDiaria;
 
-    // Converte os consumos do banco para o formato do recibo (CORRIGIDO)
     const listaConsumos: MockConsumo[] = (reserva.consumos || []).map((c: any) => ({
       descricao: c.produto.nome,
       quantidade: c.quantidade,
@@ -167,17 +201,42 @@ export default function App() {
   const totalSaidas = transacoes.filter(t => t.tipo === 'SAIDA').reduce((acc, t) => acc + t.valor, 0);
   const saldoReal = totalEntradas - totalSaidas;
 
+  // TELA DE LOGIN UNIFICADA
   if (!autenticado) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", backgroundImage: `linear-gradient(rgba(0, 50, 100, 0.4), rgba(0, 50, 100, 0.7)), url('/fundo-login.jpeg')`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
-        <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', padding: '3rem', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', width: '100%', maxWidth: '400px', textAlign: 'center', backdropFilter: 'blur(10px)' }}>
-          <div style={{ width: '80px', height: '80px', margin: '0 auto 1.5rem', borderRadius: '50%', background: 'linear-gradient(45deg, #f1c40f, #e67e22)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 15px rgba(241, 196, 15, 0.4)' }}><span style={{ fontSize: '40px' }}>🌅</span></div>
-          <h1 style={{ color: '#1a365d', margin: '0 0 5px 0', fontSize: '1.8rem' }}>Refúgio Dourado</h1>
-          <p style={{ color: '#0077b6', margin: '0 0 2rem 0', fontWeight: '500' }}>Acesso Restrito à Equipe</p>
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-            <div style={{ position: 'relative' }}><Lock size={20} color="#0077b6" style={{ position: 'absolute', top: '14px', left: '15px' }} /><input type="password" placeholder="Digite a senha de acesso" value={senhaInput} onChange={(e) => setSenhaInput(e.target.value)} required style={{ width: '100%', padding: '14px 14px 14px 45px', borderRadius: '12px', border: '2px solid #bce0fd', outline: 'none', fontSize: '1rem', color: '#1a365d', boxSizing: 'border-box' }}/></div>
-            <button type="submit" style={{ padding: '14px', backgroundColor: '#f39c12', color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem', transition: '0.3s', boxShadow: '0 4px 12px rgba(243,156,18,0.3)' }}>Entrar no Sistema</button>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '10%', fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", backgroundImage: `linear-gradient(rgba(0, 50, 100, 0.3), rgba(0, 50, 100, 0.6)), url('/fundo-login.jpeg')`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+        <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', padding: '2.5rem 2rem', borderRadius: '20px', boxShadow: '0 15px 35px rgba(0,0,0,0.3)', width: '100%', maxWidth: '360px', textAlign: 'center', backdropFilter: 'blur(8px)' }}>
+          
+          {/* LOGO OFICIAL DA POUSADA */}
+          <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
+            <img src="/logo-pousada.png" alt="Refúgio Dourado" style={{ maxWidth: '170px', height: 'auto', objectFit: 'contain' }} />
+          </div>
+
+          <p style={{ color: '#0077b6', margin: '0 0 1.5rem 0', fontWeight: '500', fontSize: '0.9rem' }}>Acesso Unificado (Gerência & Hóspedes)</p>
+          
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <input 
+              type="email" 
+              placeholder="Seu e-mail de acesso" 
+              value={emailInput} 
+              onChange={(e) => setEmailInput(e.target.value)} 
+              required 
+              style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '2px solid #bce0fd', outline: 'none', fontSize: '0.95rem', color: '#1a365d', boxSizing: 'border-box' }}
+            />
+            <div style={{ position: 'relative' }}>
+              <Lock size={18} color="#0077b6" style={{ position: 'absolute', top: '13px', left: '14px' }} />
+              <input 
+                type="password" 
+                placeholder="Sua senha" 
+                value={senhaInput} 
+                onChange={(e) => setSenhaInput(e.target.value)} 
+                required 
+                style={{ width: '100%', padding: '12px 14px 12px 42px', borderRadius: '10px', border: '2px solid #bce0fd', outline: 'none', fontSize: '0.95rem', color: '#1a365d', boxSizing: 'border-box' }}
+              />
+            </div>
+            <button type="submit" style={{ padding: '12px', backgroundColor: '#f39c12', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', transition: '0.3s', boxShadow: '0 4px 12px rgba(243,156,18,0.3)' }}>Acessar Sistema</button>
           </form>
+          <p style={{ fontSize: '0.75rem', color: '#7f8c8d', marginTop: '1.2rem' }}>Perfis: Gerente, Recepcionista, Cozinheiro & Hóspede.</p>
         </div>
       </div>
     );
@@ -188,19 +247,45 @@ export default function App() {
       
       <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '2.5rem', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{ width: '65px', height: '65px', borderRadius: '50%', background: 'linear-gradient(45deg, #f1c40f, #e67e22)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 15px rgba(241, 196, 15, 0.4)' }}><span style={{ fontSize: '32px' }}>🌅</span></div>
-          <div><h1 style={{ margin: 0, color: '#1a365d', letterSpacing: '1px', fontSize: '2.2rem' }}>Pousada Refúgio Dourado</h1><p style={{ margin: 0, color: '#0077b6', fontWeight: '500', fontSize: '1.1rem', letterSpacing: '0.5px' }}>Painel de Gestão Integrada</p></div>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+  <img src="/logo-pousada.png" alt="Refúgio Dourado" style={{ maxWidth: '160px', height: 'auto', objectFit: 'contain' }} />
+</div>
+          <div>
+            <h1 style={{ margin: 0, color: '#1a365d', letterSpacing: '1px', fontSize: '2.2rem' }}>Pousada Refúgio Dourado</h1>
+            <p style={{ margin: 0, color: '#0077b6', fontWeight: '500', fontSize: '1.05rem' }}>
+              Logado como: <strong>{usuarioLogado?.nome}</strong> ({usuarioLogado?.cargo})
+            </p>
+          </div>
         </div>
-        <button onClick={() => { setAutenticado(false); setSenhaInput(''); }} style={{ padding: '8px 16px', backgroundColor: 'transparent', color: '#e74c3c', border: '1px solid #e74c3c', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>🚪 Sair</button>
+        <button onClick={() => { setAutenticado(false); setUsuarioLogado(null); setEmailInput(''); setSenhaInput(''); }} style={{ padding: '8px 16px', backgroundColor: 'transparent', color: '#e74c3c', border: '1px solid #e74c3c', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>🚪 Sair</button>
       </div>
 
       <nav style={{ display: 'flex', gap: '1rem', marginBottom: '2.5rem', borderBottom: '2px solid rgba(0, 119, 182, 0.15)', paddingBottom: '1.5rem', overflowX: 'auto' }}>
-        <button onClick={() => setAbaAtiva('dashboard')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'dashboard' ? '#0077b6' : 'transparent', color: abaAtiva === 'dashboard' ? 'white' : '#1a365d', border: abaAtiva === 'dashboard' ? 'none' : '1px solid #0077b6', borderRadius: '30px', fontWeight: 'bold' }}>📊 Dashboard</button>
-        <button onClick={() => setAbaAtiva('hospedes')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'hospedes' ? '#0077b6' : 'transparent', color: abaAtiva === 'hospedes' ? 'white' : '#1a365d', border: abaAtiva === 'hospedes' ? 'none' : '1px solid #0077b6', borderRadius: '30px', fontWeight: 'bold' }}>👥 Hóspedes</button>
-        <button onClick={() => setAbaAtiva('quartos')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'quartos' ? '#0077b6' : 'transparent', color: abaAtiva === 'quartos' ? 'white' : '#1a365d', border: abaAtiva === 'quartos' ? 'none' : '1px solid #0077b6', borderRadius: '30px', fontWeight: 'bold' }}>🚪 Quartos / Chalés</button>
-        <button onClick={() => setAbaAtiva('reservas')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'reservas' ? '#0077b6' : 'transparent', color: abaAtiva === 'reservas' ? 'white' : '#1a365d', border: abaAtiva === 'reservas' ? 'none' : '1px solid #0077b6', borderRadius: '30px', fontWeight: 'bold' }}>📅 Reservas</button>
-        <button onClick={() => setAbaAtiva('restaurante')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'restaurante' ? '#e67e22' : 'transparent', color: abaAtiva === 'restaurante' ? 'white' : '#d35400', border: abaAtiva === 'restaurante' ? 'none' : '1px solid #e67e22', borderRadius: '30px', fontWeight: 'bold' }}>🍔 Restaurante Dengo</button>
-        <button onClick={() => setAbaAtiva('caixa')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'caixa' ? '#f39c12' : 'transparent', color: abaAtiva === 'caixa' ? 'white' : '#d35400', border: abaAtiva === 'caixa' ? 'none' : '1px solid #f39c12', borderRadius: '30px', fontWeight: 'bold' }}>💰 Caixa</button>
+        
+        {/* GERENTE e RECEPÇÃO veem Dashboard, Hóspedes, Quartos e Reservas */}
+        {(usuarioLogado?.cargo === 'GERENTE' || usuarioLogado?.cargo === 'RECEPCAO') && (
+          <>
+            <button onClick={() => setAbaAtiva('dashboard')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'dashboard' ? '#0077b6' : 'transparent', color: abaAtiva === 'dashboard' ? 'white' : '#1a365d', border: abaAtiva === 'dashboard' ? 'none' : '1px solid #0077b6', borderRadius: '30px', fontWeight: 'bold' }}>📊 Dashboard</button>
+            <button onClick={() => setAbaAtiva('hospedes')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'hospedes' ? '#0077b6' : 'transparent', color: abaAtiva === 'hospedes' ? 'white' : '#1a365d', border: abaAtiva === 'hospedes' ? 'none' : '1px solid #0077b6', borderRadius: '30px', fontWeight: 'bold' }}>👥 Hóspedes</button>
+            <button onClick={() => setAbaAtiva('quartos')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'quartos' ? '#0077b6' : 'transparent', color: abaAtiva === 'quartos' ? 'white' : '#1a365d', border: abaAtiva === 'quartos' ? 'none' : '1px solid #0077b6', borderRadius: '30px', fontWeight: 'bold' }}>🚪 Quartos / Chalés</button>
+            <button onClick={() => setAbaAtiva('reservas')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'reservas' ? '#0077b6' : 'transparent', color: abaAtiva === 'reservas' ? 'white' : '#1a365d', border: abaAtiva === 'reservas' ? 'none' : '1px solid #0077b6', borderRadius: '30px', fontWeight: 'bold' }}>📅 Reservas</button>
+          </>
+        )}
+
+        {/* GERENTE, RECEPÇÃO e COZINHA veem o Restaurante Dengo */}
+        {(usuarioLogado?.cargo === 'GERENTE' || usuarioLogado?.cargo === 'RECEPCAO' || usuarioLogado?.cargo === 'COZINHA') && (
+          <button onClick={() => setAbaAtiva('restaurante')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'restaurante' ? '#e67e22' : 'transparent', color: abaAtiva === 'restaurante' ? 'white' : '#d35400', border: abaAtiva === 'restaurante' ? 'none' : '1px solid #e67e22', borderRadius: '30px', fontWeight: 'bold' }}>🍔 Restaurante Dengo</button>
+        )}
+
+        {/* APENAS GERENTE vê o Caixa */}
+        {usuarioLogado?.cargo === 'GERENTE' && (
+          <button onClick={() => setAbaAtiva('caixa')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'caixa' ? '#f39c12' : 'transparent', color: abaAtiva === 'caixa' ? 'white' : '#d35400', border: abaAtiva === 'caixa' ? 'none' : '1px solid #f39c12', borderRadius: '30px', fontWeight: 'bold' }}>💰 Caixa</button>
+        )}
+
+        {/* APENAS HÓSPEDE vê o Portal de Pedidos */}
+        {usuarioLogado?.cargo === 'HOSPEDE' && (
+          <button onClick={() => setAbaAtiva('portal-hospede')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'portal-hospede' ? '#27ae60' : 'transparent', color: abaAtiva === 'portal-hospede' ? 'white' : '#27ae60', border: '1px solid #27ae60', borderRadius: '30px', fontWeight: 'bold' }}>🍹 Cardápio do Chalé</button>
+        )}
       </nav>
 
       {abaAtiva === 'dashboard' && (
@@ -346,19 +431,19 @@ export default function App() {
       {abaAtiva === 'restaurante' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
           <div style={{ padding: '1.5rem', borderRadius: '16px', backgroundColor: 'rgba(255,255,255,0.9)', boxShadow: '0 8px 32px rgba(0,119,182,0.08)' }}>
-            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 0, color: '#e67e22' }}><Utensils size={24} color="#e67e22" /> Cadastrar no Cardápio</h2>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 0, color: '#e67e22' }}><Utensils size={24} color="#e67e22" /> Cadastrar no Cardápio (Cozinha)</h2>
             <form onSubmit={cadastrarProduto} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1.5rem' }}>
               <input required placeholder="Nome do Prato/Bebida (Ex: Peixe Frito)" value={prodNome} onChange={e => setProdNome(e.target.value)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #f9d5a7', outline: 'none' }} />
               <input required type="number" step="0.01" placeholder="Preço (R$)" value={prodPreco} onChange={e => setProdPreco(e.target.value)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #f9d5a7', outline: 'none' }} />
               <input required type="number" placeholder="Estoque Inicial" value={prodEstoque} onChange={e => setProdEstoque(e.target.value)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #f9d5a7', outline: 'none' }} />
-              <button type="submit" style={{ padding: '14px', backgroundColor: '#e67e22', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Salvar Item</button>
+              <button type="submit" style={{ padding: '14px', backgroundColor: '#e67e22', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Salvar no Cardápio</button>
             </form>
 
             <h3 style={{ marginTop: '2rem', color: '#1a365d' }}>Cardápio Atual</h3>
             <ul style={{ listStyle: 'none', padding: 0, maxHeight: '200px', overflowY: 'auto' }}>
               {produtos.map(p => (
                 <li key={p.id} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #edf2f7', padding: '10px 0' }}>
-                  <span><strong>{p.nome}</strong> (Estoque: {p.estoque})</span>
+                  <span><strong>{p.nome}</strong> (Estq: {p.estoque})</span>
                   <span style={{ color: '#e67e22', fontWeight: 'bold' }}>{formatarMoeda(p.preco)}</span>
                 </li>
               ))}
@@ -389,6 +474,34 @@ export default function App() {
 
               <button type="submit" style={{ padding: '14px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Lançar Consumo</button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* PORTAL DO HÓSPEDE */}
+      {abaAtiva === 'portal-hospede' && (
+        <div style={{ padding: '2rem', backgroundColor: 'white', borderRadius: '20px', boxShadow: '0 8px 32px rgba(0,119,182,0.08)' }}>
+          <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+            <span style={{ fontSize: '48px' }}>🍹</span>
+            <h2 style={{ color: '#1a365d', margin: '10px 0 5px 0' }}>Restaurante Dengo - Cardápio Digital</h2>
+            <p style={{ color: '#0077b6' }}>Bem-vindo, <strong>{usuarioLogado?.nome}</strong>! Escolha seus petiscos e bebidas para debitar direto na sua conta do chalé.</p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+            {produtos.map(p => (
+              <div key={p.id} style={{ border: '1px solid #fce4c8', padding: '1.5rem', borderRadius: '16px', backgroundColor: '#fffcf7', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 8px 0', color: '#1a365d' }}>{p.nome}</h3>
+                  <p style={{ color: '#e67e22', fontWeight: 'bold', fontSize: '1.2rem', margin: '0 0 15px 0' }}>{formatarMoeda(p.preco)}</p>
+                </div>
+                <button 
+                  onClick={() => pedirComoHospede(p.id)}
+                  style={{ width: '100%', padding: '12px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                >
+                  <ShoppingBag size={18} /> Pedir para o Chalé
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}
