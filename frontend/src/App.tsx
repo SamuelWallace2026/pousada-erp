@@ -2,9 +2,18 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Users, BedDouble, UserPlus, List, DoorOpen, CalendarCheck, Activity, Key, Lock, Utensils, ShoppingBag } from 'lucide-react';
 import { gerarReciboPdf, type MockReserva, type MockConsumo } from './utils/gerarReciboPdf'; 
-
+import MapaInterativo from './components/MapaInterativo';
 interface Hospede { id: string; nome: string; cpf: string; email: string; telefone: string; }
-interface Quarto { id: string; numero: string; capacidade: number; valorDiaria: number; status: string; categoria: string; }
+interface Quarto { 
+  id: string; 
+  numero: string; 
+  capacidade: number; 
+  valorDiaria: number; 
+  status: string; 
+  categoria: string; 
+  descricao?: string;      // Adicionado para suportar o texto do chalé
+  itensInclusos?: string;  // Adicionado para suportar os itens inclusos
+}
 interface Reserva { id: string; dataCheckIn: string; dataCheckOut: string; status: string; origem: string; hospede: Hospede; quarto: Quarto; consumos?: any[]; }
 interface Produto { id: string; nome: string; preco: number; estoque: number; }
 interface Transacao { id: string; tipo: string; valor: number; metodoPagamento: string; descricao: string; criadoEm: string; }
@@ -17,7 +26,7 @@ export default function App() {
   const [emailInput, setEmailInput] = useState('');
   const [senhaInput, setSenhaInput] = useState('');
 
-  const [abaAtiva, setAbaAtiva] = useState<'dashboard' | 'hospedes' | 'quartos' | 'reservas' | 'restaurante' | 'caixa' | 'portal-hospede'>('dashboard');
+  const [abaAtiva, setAbaAtiva] = useState<'dashboard' | 'hospedes' | 'quartos' | 'reservas' | 'restaurante' | 'caixa' | 'portal-hospede' | 'mapa'>('dashboard');
   
   const [hospedes, setHospedes] = useState<Hospede[]>([]);
   const [quartos, setQuartos] = useState<Quarto[]>([]);
@@ -269,6 +278,7 @@ export default function App() {
             <button onClick={() => setAbaAtiva('hospedes')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'hospedes' ? '#0077b6' : 'transparent', color: abaAtiva === 'hospedes' ? 'white' : '#1a365d', border: abaAtiva === 'hospedes' ? 'none' : '1px solid #0077b6', borderRadius: '30px', fontWeight: 'bold' }}>👥 Hóspedes</button>
             <button onClick={() => setAbaAtiva('quartos')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'quartos' ? '#0077b6' : 'transparent', color: abaAtiva === 'quartos' ? 'white' : '#1a365d', border: abaAtiva === 'quartos' ? 'none' : '1px solid #0077b6', borderRadius: '30px', fontWeight: 'bold' }}>🚪 Quartos / Chalés</button>
             <button onClick={() => setAbaAtiva('reservas')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'reservas' ? '#0077b6' : 'transparent', color: abaAtiva === 'reservas' ? 'white' : '#1a365d', border: abaAtiva === 'reservas' ? 'none' : '1px solid #0077b6', borderRadius: '30px', fontWeight: 'bold' }}>📅 Reservas</button>
+            <button onClick={() => setAbaAtiva('mapa')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'mapa' ? '#0077b6' : 'transparent', color: abaAtiva === 'mapa' ? 'white' : '#1a365d', border: abaAtiva === 'mapa' ? 'none' : '1px solid #0077b6', borderRadius: '30px', fontWeight: 'bold' }}>🗺️ Mapa</button>
           </>
         )}
 
@@ -287,6 +297,13 @@ export default function App() {
           <button onClick={() => setAbaAtiva('portal-hospede')} style={{ padding: '10px 22px', cursor: 'pointer', backgroundColor: abaAtiva === 'portal-hospede' ? '#27ae60' : 'transparent', color: abaAtiva === 'portal-hospede' ? 'white' : '#27ae60', border: '1px solid #27ae60', borderRadius: '30px', fontWeight: 'bold' }}>🍹 Cardápio do Chalé</button>
         )}
       </nav>
+
+      {abaAtiva === 'mapa' && (
+  <MapaInterativo 
+    quartos={quartos} 
+    onSelecionarQuarto={(q) => alert(`Chalé: ${q.categoria} (Nº ${q.numero})\nStatus: ${q.status}`)} 
+  />
+)}
 
       {abaAtiva === 'dashboard' && (
         <div>
@@ -363,7 +380,7 @@ export default function App() {
           <div style={{ padding: '1.5rem', borderRadius: '16px', backgroundColor: 'rgba(255,255,255,0.9)', boxShadow: '0 8px 32px rgba(0,119,182,0.08)' }}>
             <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 0, color: '#1a365d' }}><BedDouble size={24} color="#0077b6" /> Cadastrados</h2>
             
-            {/* AQUI FOI CORRIGIDO: Removemos a tag <ul> antiga e deixamos apenas a grid das divs */}
+            
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginTop: '1.5rem' }}>
               {quartos.map(quarto => (
 <div key={quarto.id} style={{ 
