@@ -338,6 +338,8 @@ export default function App() {
 
       {abaAtiva === 'quartos' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
+          
+          {/* LADO ESQUERDO: FORMULÁRIO DE CADASTRO */}
           <div style={{ padding: '1.5rem', borderRadius: '16px', backgroundColor: 'rgba(255,255,255,0.9)', boxShadow: '0 8px 32px rgba(0,119,182,0.08)' }}>
             <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 0, color: '#1a365d' }}><DoorOpen size={24} color="#0077b6" /> Novo Quarto/Chalé</h2>
             <form onSubmit={cadastrarQuarto} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1.5rem' }}>
@@ -356,18 +358,72 @@ export default function App() {
               <button type="submit" style={{ padding: '14px', backgroundColor: '#f39c12', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Salvar Acomodação</button>
             </form>
           </div>
+          
+          {/* LADO DIREITO: LISTAGEM DE QUARTOS */}
           <div style={{ padding: '1.5rem', borderRadius: '16px', backgroundColor: 'rgba(255,255,255,0.9)', boxShadow: '0 8px 32px rgba(0,119,182,0.08)' }}>
             <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 0, color: '#1a365d' }}><BedDouble size={24} color="#0077b6" /> Cadastrados</h2>
-            <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              {quartos.map(q => (
-                <li key={q.id} style={{ border: '1px solid #edf2f7', padding: '1.2rem', borderRadius: '12px', backgroundColor: q.status === 'LIVRE' ? '#fff' : '#fdf3e7' }}>
-                  <h3 style={{ margin: '0 0 5px 0', color: '#1a365d' }}>{q.numero}</h3>
-                  <span style={{ display: 'inline-block', backgroundColor: '#e0fbfc', color: '#0077b6', padding: '4px 8px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '10px' }}>{q.categoria}</span>
-                  <p style={{ margin: '4px 0', color: '#0077b6' }}>Diária: R$ {q.valorDiaria} | Cap: {q.capacidade} pess.</p>
-                  <p style={{ margin: '4px 0', fontWeight: 'bold', color: q.status === 'LIVRE' ? '#2ecc71' : '#e74c3c' }}>Status: {q.status}</p>
-                </li>
+            
+            {/* AQUI FOI CORRIGIDO: Removemos a tag <ul> antiga e deixamos apenas a grid das divs */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginTop: '1.5rem' }}>
+              {quartos.map(quarto => (
+<div key={quarto.id} style={{ 
+                  /* NOVO: Imagem de fundo com película branca super clara */
+                  backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.96)), url('/fundo-login.jpeg')`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  
+                  /* Estilos originais mantidos */
+                  border: '1px solid #e0e0e0', 
+                  padding: '1.5rem', 
+                  borderRadius: '16px', 
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '12px', 
+                  transition: 'transform 0.2s' 
+                }}>
+                  
+                  {/* CABEÇALHO DO CARD */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <h3 style={{ margin: '0 0 4px 0', color: '#1a365d', fontSize: '1.2rem', lineHeight: '1.2' }}>{quarto.categoria}</h3>
+                      <span style={{ color: '#7f8c8d', fontSize: '0.85rem', fontWeight: 'bold' }}>Chalé / Quarto: {quarto.numero}</span>
+                    </div>
+                    <span style={{ backgroundColor: quarto.status === 'LIVRE' ? '#e8f8f5' : '#fdedec', color: quarto.status === 'LIVRE' ? '#27ae60' : '#e74c3c', padding: '6px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', border: `1px solid ${quarto.status === 'LIVRE' ? '#27ae60' : '#e74c3c'}` }}>
+                      {quarto.status}
+                    </span>
+                  </div>
+                  
+                  {/* DESCRIÇÃO DO QUARTO */}
+                  <p style={{ margin: 0, color: '#576574', fontSize: '0.9rem', lineHeight: '1.5', textAlign: 'justify' }}>
+                    {quarto.descricao || 'Nenhuma descrição cadastrada para esta acomodação.'}
+                  </p>
+                  
+                  {/* ITENS INCLUSOS */}
+                  <div style={{ backgroundColor: '#fcf3eb', padding: '12px', borderRadius: '8px', borderLeft: '4px solid #f39c12' }}>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#8e44ad', lineHeight: '1.4' }}>
+                      <strong style={{ color: '#d35400' }}>✨ Inclusos:</strong> {quarto.itensInclusos || 'Não especificado.'}
+                    </p>
+                  </div>
+
+                  {/* RODAPÉ: CAPACIDADE E VALOR */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid #f1f2f6' }}>
+                    <span style={{ color: '#2980b9', fontSize: '0.9rem', fontWeight: '500' }}>
+                      👥 Até {quarto.capacidade} pessoas
+                    </span>
+                    <span style={{ color: '#27ae60', fontWeight: 'bold', fontSize: '1.15rem' }}>
+                      {formatarMoeda(quarto.valorDiaria)}
+                    </span>
+                  </div>
+                </div>
               ))}
-            </ul>
+              
+              {quartos.length === 0 && (
+                <p style={{ textAlign: 'center', color: '#95a5a6', gridColumn: '1 / -1', padding: '2rem' }}>
+                  Nenhum quarto cadastrado ainda.
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -478,13 +534,22 @@ export default function App() {
         </div>
       )}
 
-      {/* PORTAL DO HÓSPEDE */}
+      
+    {/* PORTAL DO HÓSPEDE */}
       {abaAtiva === 'portal-hospede' && (
         <div style={{ padding: '2rem', backgroundColor: 'white', borderRadius: '20px', boxShadow: '0 8px 32px rgba(0,119,182,0.08)' }}>
-          <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <span style={{ fontSize: '48px' }}>🍹</span>
             <h2 style={{ color: '#1a365d', margin: '10px 0 5px 0' }}>Restaurante Dengo - Cardápio Digital</h2>
-            <p style={{ color: '#0077b6' }}>Bem-vindo, <strong>{usuarioLogado?.nome}</strong>! Escolha seus petiscos e bebidas para debitar direto na sua conta do chalé.</p>
+            <p style={{ color: '#0077b6', marginBottom: '1.5rem' }}>Bem-vindo, <strong>{usuarioLogado?.nome}</strong>! Escolha seus petiscos e bebidas para debitar direto na sua conta do chalé.</p>
+            
+            {/* NOVO: BANNER DE WI-FI PARA O HÓSPEDE */}
+            <div style={{ display: 'inline-block', backgroundColor: '#e0fbfc', padding: '12px 24px', borderRadius: '12px', border: '1px dashed #0077b6' }}>
+              <p style={{ margin: 0, color: '#1a365d', fontSize: '0.95rem' }}>
+                📶 <strong>Wi-Fi da Pousada</strong> <br/>
+                Rede: <span style={{ color: '#0077b6', fontWeight: 'bold' }}>Refugio Dourado cliente</span> | Senha: <span style={{ color: '#e67e22', fontWeight: 'bold' }}>bemvindo</span>
+              </p>
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
@@ -502,6 +567,10 @@ export default function App() {
                 </button>
               </div>
             ))}
+            
+            {produtos.length === 0 && (
+              <p style={{ textAlign: 'center', color: '#95a5a6', gridColumn: '1 / -1' }}>O cardápio está sendo atualizado pela cozinha. Volte em instantes!</p>
+            )}
           </div>
         </div>
       )}
