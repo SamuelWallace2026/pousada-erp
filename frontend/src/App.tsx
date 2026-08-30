@@ -22,8 +22,16 @@ export default function App() {
   const [emailInput, setEmailInput] = useState('');
   const [senhaInput, setSenhaInput] = useState('');
 
-  const [abaAtiva, setAbaAtiva] = useState<'dashboard' | 'hospedes' | 'quartos' | 'reservas' | 'restaurante' | 'caixa' | 'portal-hospede' | 'mapa'>('dashboard');
+  const [abaAtiva, setAbaAtiva] = useState<'dashboard' | 'hospedes' | 'quartos' | 'reservas' | 'restaurante' | 'caixa' | 'portal-hospede' | 'mapa' | 'configuracoes'>('dashboard');
   
+  // --- ESTADOS DO PERFIL / CONFIGURAÇÕES ---
+  const [perfilNome, setPerfilNome] = useState('');
+  const [perfilEmail, setPerfilEmail] = useState('');
+  const [perfilTelefone, setPerfilTelefone] = useState('');
+  const [notificacoesEmail, setNotificacoesEmail] = useState(true);
+  const [alertasReserva, setAlertasReserva] = useState(true);
+  const [relatoriosSemanais, setRelatoriosSemanais] = useState(false);
+
   const [hospedes, setHospedes] = useState<Hospede[]>([]);
   const [quartos, setQuartos] = useState<Quarto[]>([]);
   const [reservas, setReservas] = useState<Reserva[]>([]);
@@ -86,6 +94,16 @@ export default function App() {
   const buscarProdutos = () => axios.get('http://localhost:3333/api/produtos').then(res => setProdutos(res.data));
   const buscarTransacoes = () => axios.get('http://localhost:3333/api/transacoes').then(res => setTransacoes(res.data));
 
+  // Preenche os dados do perfil quando o usuário loga
+  useEffect(() => {
+    if (usuarioLogado) {
+      setPerfilNome(usuarioLogado.nome || '');
+      setPerfilEmail(usuarioLogado.email || '');
+      setPerfilTelefone(usuarioLogado.telefone || '+55 (88) 99999-9999');
+    }
+  }, [usuarioLogado]);
+
+  // Carregamento principal ao mudar de aba
   useEffect(() => {
     if (autenticado) {
       if (abaAtiva === 'hospedes') buscarHospedes();
@@ -96,6 +114,20 @@ export default function App() {
       if (abaAtiva === 'caixa') buscarTransacoes();
       if (abaAtiva === 'dashboard') { buscarHospedes(); buscarQuartos(); buscarReservas(); }
     }
+  }, [abaAtiva, autenticado]);
+
+  // ATUALIZAÇÃO AUTOMÁTICA SEGURA PARA A COZINHA (A CADA 10 SEGUNDOS)
+  useEffect(() => {
+    let intervalo: ReturnType<typeof setInterval>;
+    if (autenticado && (abaAtiva === 'restaurante' || abaAtiva === 'portal-hospede')) {
+      intervalo = setInterval(() => {
+        buscarPedidosCozinha();
+      }, 10000);
+    }
+    // Limpa o temporizador ao sair da aba para não pesar o navegador
+    return () => {
+      if (intervalo) clearInterval(intervalo);
+    };
   }, [abaAtiva, autenticado]);
 
   const mascaraCPF = (valor: string) => valor.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})/, '$1-$2').replace(/(-\d{2})\d+?$/, '$1');
@@ -232,9 +264,12 @@ export default function App() {
         </nav>
 
         <div className="p-4 border-t border-outline-variant/20 flex flex-col gap-1 flex-shrink-0">
-           <div className="px-4 py-3 text-sm text-secondary font-body-md flex items-center gap-3">
-              <Settings size={20} /> Configurações
-           </div>
+           <button 
+             onClick={() => { setAbaAtiva('configuracoes'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
+             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-label-md transition-all duration-200 text-left cursor-pointer select-none ${abaAtiva === 'configuracoes' ? 'bg-primary-container/20 text-on-surface font-bold border border-primary-container/30 shadow-sm' : 'text-secondary hover:bg-surface-container hover:text-on-surface'}`}
+           >
+              <Settings size={20} className={abaAtiva === 'configuracoes' ? "text-primary" : "text-secondary"} /> Configurações
+           </button>
            <button onClick={() => { setAutenticado(false); setUsuarioLogado(null); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-label-md text-secondary hover:bg-error-container hover:text-on-error-container transition-colors text-left cursor-pointer">
               <LogOut size={20} /> Sair
            </button>
@@ -761,6 +796,112 @@ export default function App() {
                   ))}
                 </div>
               </section>
+            </div>
+          )}
+
+          {/* --- CONFIGURAÇÕES / PERFIL --- */}
+          {abaAtiva === 'configuracoes' && (
+            <div className="flex flex-col gap-6 max-w-5xl mx-auto w-full pt-4">
+              <h1 className="font-headline-lg text-3xl text-on-surface">Gestão de Perfil</h1>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-1 bg-surface-container-lowest rounded-xl shadow-level-1 p-8 ghost-border flex flex-col items-center text-center self-start">
+                  <div className="w-32 h-32 rounded-full overflow-hidden mb-5 border-4 border-surface shadow-sm">
+                    <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=256&auto=format&fit=crop" alt="Foto de Perfil" className="w-full h-full object-cover" />
+                  </div>
+                  <h2 className="font-headline-md text-xl text-on-surface font-bold">{usuarioLogado?.nome || 'Administrador'}</h2>
+                  <p className="text-secondary font-body-md mb-6">{usuarioLogado?.cargo === 'GERENTE' ? 'Administrador Geral' : usuarioLogado?.cargo || 'Membro da Equipe'}</p>
+                  <button className="w-full py-2.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-md font-bold hover:bg-surface-container transition-colors cursor-pointer">
+                    Alterar Foto
+                  </button>
+                </div>
+
+                <div className="lg:col-span-2 flex flex-col gap-6">
+                  <div className="bg-surface-container-lowest rounded-xl shadow-level-1 p-6 lg:p-8 ghost-border">
+                    <h3 className="font-headline-md text-xl text-on-surface mb-6 font-bold">Informações Pessoais</h3>
+                    <div className="flex flex-col gap-5">
+                      <div>
+                        <label className="text-xs font-bold text-secondary mb-1 block">Nome Completo</label>
+                        <input type="text" value={perfilNome} onChange={e => setPerfilNome(e.target.value)} className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" />
+                      </div>
+                      <div className="flex flex-col md:flex-row gap-5">
+                        <div className="flex-1">
+                          <label className="text-xs font-bold text-secondary mb-1 block">Email Corporativo</label>
+                          <input type="email" value={perfilEmail} onChange={e => setPerfilEmail(e.target.value)} className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-xs font-bold text-secondary mb-1 block">Telefone</label>
+                          <input type="text" value={perfilTelefone} onChange={e => setPerfilTelefone(e.target.value)} className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-surface-container-lowest rounded-xl shadow-level-1 p-6 lg:p-8 ghost-border">
+                    <h3 className="font-headline-md text-xl text-on-surface mb-6 font-bold">Segurança</h3>
+                    <div className="flex flex-col gap-5">
+                      <div>
+                        <label className="text-xs font-bold text-secondary mb-1 block">Senha Atual</label>
+                        <input type="password" placeholder="••••••••" className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" />
+                      </div>
+                      <div className="flex flex-col md:flex-row gap-5">
+                        <div className="flex-1">
+                          <label className="text-xs font-bold text-secondary mb-1 block">Nova Senha</label>
+                          <input type="password" placeholder="Sua nova senha" className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-xs font-bold text-secondary mb-1 block">Confirmar Nova Senha</label>
+                          <input type="password" placeholder="Confirme a nova senha" className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-surface-container-lowest rounded-xl shadow-level-1 p-6 lg:p-8 ghost-border">
+                    <h3 className="font-headline-md text-xl text-on-surface mb-6 font-bold">Preferências</h3>
+                    <div className="flex flex-col gap-6">
+                      
+                      <div className="flex justify-between items-center gap-4">
+                        <div>
+                          <h4 className="font-label-md text-on-surface text-base">Notificações por Email</h4>
+                          <p className="font-body-sm text-secondary text-sm mt-0.5">Receber atualizações gerais e comunicados do sistema.</p>
+                        </div>
+                        <button onClick={() => setNotificacoesEmail(!notificacoesEmail)} className={`w-12 h-6 flex-shrink-0 rounded-full flex items-center p-1 transition-colors cursor-pointer ${notificacoesEmail ? 'bg-[#c5a059]' : 'bg-outline-variant/50'}`}>
+                          <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-300 ${notificacoesEmail ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                        </button>
+                      </div>
+
+                      <div className="flex justify-between items-center gap-4">
+                        <div>
+                          <h4 className="font-label-md text-on-surface text-base">Alertas de Reserva</h4>
+                          <p className="font-body-sm text-secondary text-sm mt-0.5">Seja notificado imediatamente sobre novas reservas ou cancelamentos.</p>
+                        </div>
+                        <button onClick={() => setAlertasReserva(!alertasReserva)} className={`w-12 h-6 flex-shrink-0 rounded-full flex items-center p-1 transition-colors cursor-pointer ${alertasReserva ? 'bg-[#c5a059]' : 'bg-outline-variant/50'}`}>
+                          <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-300 ${alertasReserva ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                        </button>
+                      </div>
+
+                      <div className="flex justify-between items-center gap-4">
+                        <div>
+                          <h4 className="font-label-md text-on-surface text-base">Relatórios Semanais</h4>
+                          <p className="font-body-sm text-secondary text-sm mt-0.5">Receba um resumo de desempenho financeiro e ocupação toda segunda-feira.</p>
+                        </div>
+                        <button onClick={() => setRelatoriosSemanais(!relatoriosSemanais)} className={`w-12 h-6 flex-shrink-0 rounded-full flex items-center p-1 transition-colors cursor-pointer ${relatoriosSemanais ? 'bg-[#c5a059]' : 'bg-outline-variant/50'}`}>
+                          <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-300 ${relatoriosSemanais ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                        </button>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end mt-2 mb-8">
+                    <button onClick={() => alert('Configurações salvas com sucesso!')} className="px-8 py-3 bg-[#c5a059] text-white font-label-md font-bold rounded-lg hover:brightness-95 transition-all shadow-sm cursor-pointer">
+                      Salvar Alterações
+                    </button>
+                  </div>
+
+                </div>
+              </div>
             </div>
           )}
 

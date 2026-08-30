@@ -46,7 +46,7 @@ export function gerarReciboPdf(reserva: MockReserva) {
   doc.setTextColor(...corCinza);
   doc.setFontSize(10);
   doc.text(`Comprovante ID: ${reserva.id.slice(0, 8).toUpperCase()}`, 14, 45);
-  doc.text(`Emitido em: ${new Date().toLocaleDateString('pt-BR')}`, 145, 45);
+  doc.text(`Emitido em: ${new Date().toLocaleString('pt-BR')}`, 145, 45);
 
   // Dados do Hóspede
   doc.setFillColor(245, 247, 250);
@@ -127,7 +127,7 @@ export function gerarReciboPdf(reserva: MockReserva) {
   doc.setFontSize(9);
   doc.setFont('helvetica', 'italic');
   doc.text('Agradecemos a preferência! Esperamos vê-lo novamente em breve.', 105, 275, { align: 'center' });
-  doc.text('Pousada Refúgio Dourado - Canoa Quebrada / CE', 105, 280, { align: 'center' });
+  doc.text('Pousada Refúgio Dourado - Marjolândia / CE', 105, 280, { align: 'center' });
 
   // Disparo do download
   doc.save(`Recibo_${reserva.cliente.replace(/\s+/g, '_')}.pdf`);
