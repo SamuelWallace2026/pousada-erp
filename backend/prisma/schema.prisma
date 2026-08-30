@@ -106,6 +106,7 @@ model Consumo {
   id         String   @id @default(uuid())
   reservaId  String
   produtoId  String
+  observacoes String?
   status     String   @default("SOLICITADO") // "SOLICITADO", "EM_PREPARO", "PRONTO", "ENTREGUE"
   quantidade Int
   subtotal   Float

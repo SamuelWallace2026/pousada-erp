@@ -3,7 +3,8 @@ import axios from 'axios';
 import { 
   Users, BedDouble, CalendarCheck, Activity, Key, Lock, 
   Utensils, ShoppingBag, Search, LogOut, LayoutDashboard, 
-  Wallet, Map, Plus, Settings, RefreshCw, QrCode
+  Wallet, Map, Plus, Settings, RefreshCw, QrCode, Menu, X,
+  Compass, Thermometer, MessageSquare, Check, Clock, ChevronRight, Wind, Flame, AlertCircle
 } from 'lucide-react';
 import { gerarReciboPdf, type MockReserva, type MockConsumo } from './utils/gerarReciboPdf'; 
 import MapaInterativo from './components/MapaInterativo';
@@ -23,6 +24,7 @@ export default function App() {
   const [senhaInput, setSenhaInput] = useState('');
 
   const [abaAtiva, setAbaAtiva] = useState<'dashboard' | 'hospedes' | 'quartos' | 'reservas' | 'restaurante' | 'caixa' | 'portal-hospede' | 'mapa' | 'configuracoes'>('dashboard');
+  const [menuMobileAberto, setMenuMobileAberto] = useState(false); 
   
   // --- ESTADOS DO PERFIL / CONFIGURAÇÕES ---
   const [perfilNome, setPerfilNome] = useState('');
@@ -31,6 +33,12 @@ export default function App() {
   const [notificacoesEmail, setNotificacoesEmail] = useState(true);
   const [alertasReserva, setAlertasReserva] = useState(true);
   const [relatoriosSemanais, setRelatoriosSemanais] = useState(false);
+  const [fotoPerfil, setFotoPerfil] = useState('https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=256&auto=format&fit=crop');
+
+  // --- ESTADOS DO PORTAL DO HÓSPEDE (SPRINT 1) ---
+  const [abaPortal, setAbaPortal] = useState<'visao-geral' | 'guia' | 'concierge' | 'preferencias'>('visao-geral');
+  const [prefTemp, setPrefTemp] = useState(22);
+  const [outrasRestricoes, setOutrasRestricoes] = useState(''); // Estado da caixa de texto das restrições
 
   const [hospedes, setHospedes] = useState<Hospede[]>([]);
   const [quartos, setQuartos] = useState<Quarto[]>([]);
@@ -94,7 +102,6 @@ export default function App() {
   const buscarProdutos = () => axios.get('http://localhost:3333/api/produtos').then(res => setProdutos(res.data));
   const buscarTransacoes = () => axios.get('http://localhost:3333/api/transacoes').then(res => setTransacoes(res.data));
 
-  // Preenche os dados do perfil quando o usuário loga
   useEffect(() => {
     if (usuarioLogado) {
       setPerfilNome(usuarioLogado.nome || '');
@@ -103,7 +110,6 @@ export default function App() {
     }
   }, [usuarioLogado]);
 
-  // Carregamento principal ao mudar de aba
   useEffect(() => {
     if (autenticado) {
       if (abaAtiva === 'hospedes') buscarHospedes();
@@ -116,7 +122,6 @@ export default function App() {
     }
   }, [abaAtiva, autenticado]);
 
-  // ATUALIZAÇÃO AUTOMÁTICA SEGURA PARA A COZINHA (A CADA 10 SEGUNDOS)
   useEffect(() => {
     let intervalo: ReturnType<typeof setInterval>;
     if (autenticado && (abaAtiva === 'restaurante' || abaAtiva === 'portal-hospede')) {
@@ -124,10 +129,7 @@ export default function App() {
         buscarPedidosCozinha();
       }, 10000);
     }
-    // Limpa o temporizador ao sair da aba para não pesar o navegador
-    return () => {
-      if (intervalo) clearInterval(intervalo);
-    };
+    return () => { if (intervalo) clearInterval(intervalo); };
   }, [abaAtiva, autenticado]);
 
   const mascaraCPF = (valor: string) => valor.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})/, '$1-$2').replace(/(-\d{2})\d+?$/, '$1');
@@ -151,7 +153,27 @@ export default function App() {
   const cadastrarQuarto = async (e: React.FormEvent) => { e.preventDefault(); await axios.post('http://localhost:3333/api/quartos', { numero, capacidade: Number(capacidade), valorDiaria: Number(valorDiaria), categoria }); alert('Quarto salvo!'); setNumero(''); setCapacidade(''); setValorDiaria(''); setCategoria('Chalé Luxo Casal'); buscarQuartos(); };
   const cadastrarReserva = async (e: React.FormEvent) => { e.preventDefault(); try { await axios.post('http://localhost:3333/api/reservas', { hospedeId, quartoId, dataCheckIn, dataCheckOut, origem }); alert('Reserva confirmada!'); setHospedeId(''); setQuartoId(''); setDataCheckIn(''); setDataCheckOut(''); setOrigem('WhatsApp'); buscarReservas(); buscarQuartos(); } catch (error) { alert('Erro ao criar reserva.'); } };
   const cadastrarProduto = async (e: React.FormEvent) => { e.preventDefault(); try { await axios.post('http://localhost:3333/api/produtos', { nome: prodNome, preco: Number(prodPreco), estoque: Number(prodEstoque), categoria: prodCategoria }); alert('Item salvo!'); setProdNome(''); setProdPreco(''); setProdEstoque(''); setProdCategoria('Prato Principal'); buscarProdutos(); } catch (error) { alert('Erro ao cadastrar produto.'); } };
-  const pedirComoHospede = async (produtoId: string) => { if (!extratoHospede || !extratoHospede.temReserva) { alert('Sua conta não está vinculada a nenhuma reserva ativa.'); return; } try { await axios.post('http://localhost:3333/api/consumos', { reservaId: extratoHospede.reservaId, produtoId, quantidade: 1 }); alert('Pedido realizado!'); buscarPedidosCozinha(); buscarExtratoHospede(usuarioLogado.email); } catch (error) { alert('Erro ao registrar pedido.'); } };
+  
+  // FUNÇÃO DE PEDIR ATUALIZADA: AGORA ENVIA A OBSERVAÇÃO PARA A COZINHA!
+  const pedirComoHospede = async (produtoId: string) => { 
+    if (!extratoHospede || !extratoHospede.temReserva) { alert('Sua conta não está vinculada a nenhuma reserva ativa.'); return; } 
+    try { 
+      // Enviando o campo `observacoes` junto com a requisição
+      await axios.post('http://localhost:3333/api/consumos', { 
+        reservaId: extratoHospede.reservaId, 
+        produtoId, 
+        quantidade: 1,
+        observacoes: outrasRestricoes // A PONTE AQUI!
+      }); 
+      alert('Pedido realizado!'); 
+      setAbaPortal('visao-geral'); 
+      buscarPedidosCozinha(); 
+      buscarExtratoHospede(usuarioLogado.email); 
+    } catch (error) { 
+      alert('Erro ao registrar pedido.'); 
+    } 
+  };
+  
   const cancelarPedido = async (id: string) => { if (!window.confirm('Cancelar este pedido?')) return; try { await axios.put(`http://localhost:3333/api/consumos/${id}/cancelar`); alert('Cancelado.'); buscarPedidosCozinha(); buscarExtratoHospede(usuarioLogado.email); } catch (error: any) { alert(error.response?.data?.error || 'Erro.'); } };
   const fazerCheckout = async (reservaId: string) => { if (!window.confirm('Deseja finalizar esta reserva?')) return; try { await axios.put(`http://localhost:3333/api/reservas/${reservaId}/checkout`); alert('Check-out realizado!'); buscarReservas(); buscarQuartos(); } catch (error) { alert('Erro no check-out.'); } };
 
@@ -211,6 +233,7 @@ export default function App() {
       <button 
         onClick={() => {
           setAbaAtiva(id);
+          setMenuMobileAberto(false);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }} 
         className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-label-md transition-all duration-200 text-left cursor-pointer select-none
@@ -224,19 +247,22 @@ export default function App() {
   };
 
   return (
-    <div className="bg-background text-on-background min-h-screen flex antialiased w-full">
+    <div className="bg-background text-on-background min-h-screen flex antialiased w-full relative">
       
-      {/* SIDEBAR FIXA ESTÁTICA COM NOME AJUSTADO */}
-      <aside className="w-[280px] bg-surface-container-low border-r border-outline-variant/30 hidden md:flex flex-col h-screen fixed left-0 top-0 z-30 select-none">
-        
-        <div className="p-6 flex flex-col items-center border-b border-outline-variant/20 flex-shrink-0">
-          <h1 className="font-display-lg text-primary text-xl text-center leading-tight font-bold">Refúgio Dourado</h1>
+      {menuMobileAberto && (
+        <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setMenuMobileAberto(false)}></div>
+      )}
+
+      <aside className={`w-[280px] bg-surface-container-low border-r border-outline-variant/30 flex flex-col h-screen fixed left-0 top-0 z-40 select-none transition-transform duration-300 ${menuMobileAberto ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className="p-6 flex flex-col items-center border-b border-outline-variant/20 flex-shrink-0 relative">
+          <button onClick={() => setMenuMobileAberto(false)} className="md:hidden absolute top-4 right-4 text-secondary p-1"><X size={24} /></button>
+          <h1 className="font-display-lg text-primary text-xl text-center leading-tight font-bold mt-2 md:mt-0">Refúgio Dourado</h1>
           <p className="text-[10px] uppercase tracking-widest text-secondary mt-1">Painel Administrativo</p>
         </div>
 
         {(usuarioLogado?.cargo === 'GERENTE' || usuarioLogado?.cargo === 'RECEPCAO') && (
           <div className="px-6 pt-5 pb-2 flex-shrink-0">
-            <button onClick={() => setAbaAtiva('reservas')} className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-primary-container text-on-primary-container font-label-md hover:brightness-95 transition-all shadow-sm cursor-pointer">
+            <button onClick={() => { setAbaAtiva('reservas'); setMenuMobileAberto(false); }} className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-primary-container text-on-primary-container font-label-md hover:brightness-95 transition-all shadow-sm cursor-pointer">
               <Plus size={18} /> Novo Check-in
             </button>
           </div>
@@ -265,7 +291,7 @@ export default function App() {
 
         <div className="p-4 border-t border-outline-variant/20 flex flex-col gap-1 flex-shrink-0">
            <button 
-             onClick={() => { setAbaAtiva('configuracoes'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
+             onClick={() => { setAbaAtiva('configuracoes'); setMenuMobileAberto(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-label-md transition-all duration-200 text-left cursor-pointer select-none ${abaAtiva === 'configuracoes' ? 'bg-primary-container/20 text-on-surface font-bold border border-primary-container/30 shadow-sm' : 'text-secondary hover:bg-surface-container hover:text-on-surface'}`}
            >
               <Settings size={20} className={abaAtiva === 'configuracoes' ? "text-primary" : "text-secondary"} /> Configurações
@@ -276,12 +302,14 @@ export default function App() {
         </div>
       </aside>
 
-      {/* CONTEÚDO PRINCIPAL */}
       <div className="flex-1 flex flex-col min-h-screen bg-background md:ml-[280px]">
         
-        <header className="md:hidden h-16 bg-surface border-b border-outline-variant/20 flex items-center justify-between px-4 flex-shrink-0">
-          <h1 className="font-display-lg text-primary text-xl font-bold">Refúgio Dourado</h1>
-          <button onClick={() => { setAutenticado(false); setUsuarioLogado(null); }} className="text-secondary p-2"><LogOut size={20} /></button>
+        <header className="md:hidden h-16 bg-surface border-b border-outline-variant/20 flex items-center justify-between px-4 flex-shrink-0 z-20 sticky top-0">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setMenuMobileAberto(true)} className="text-secondary p-2 -ml-2 hover:bg-surface-container rounded-full transition-colors"><Menu size={24} /></button>
+            <h1 className="font-display-lg text-primary text-xl font-bold">Refúgio Dourado</h1>
+          </div>
+          <button onClick={() => { setAutenticado(false); setUsuarioLogado(null); }} className="text-secondary p-2 -mr-2"><LogOut size={20} /></button>
         </header>
 
         <main className="flex-1 p-4 md:p-10 w-full max-w-[1200px] mx-auto">
@@ -541,7 +569,6 @@ export default function App() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
                 <div className="lg:col-span-1 bg-surface-container-lowest rounded-xl shadow-level-1 p-6 ghost-border self-start">
                   <h2 className="font-headline-md text-xl text-on-surface mb-6 border-b border-outline-variant/20 pb-2">Novo Prato</h2>
                   <form onSubmit={cadastrarProduto} className="flex flex-col gap-4">
@@ -564,11 +591,22 @@ export default function App() {
                   </h2>
                   <div className="flex flex-col gap-4 max-h-[600px] overflow-y-auto pr-2">
                     {Array.isArray(pedidosCozinha) && pedidosCozinha.map((pedido: any) => (
-                      <div key={pedido.id} className={`p-4 rounded-xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${pedido?.status === 'CANCELADO' ? 'bg-error-container border-error/20' : 'bg-white shadow-sm border-outline-variant/50'}`}>
+                      <div key={pedido.id} className={`p-5 rounded-xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${pedido?.status === 'CANCELADO' ? 'bg-error-container border-error/20' : 'bg-white shadow-sm border-outline-variant/50'}`}>
                         <div>
                           <h4 className="font-headline-md text-lg text-on-surface mb-1">{pedido?.quantidade || 1}x {pedido?.produto?.nome || 'Item'}</h4>
-                          <p className="font-body-sm text-secondary mb-2">Destino: Chalé {pedido?.reserva?.quarto?.numero || 'N/A'} ({pedido?.reserva?.hospede?.nome || 'Hóspede'})</p>
-                          <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${pedido?.status === 'SOLICITADO' ? 'bg-orange-100 text-orange-800' : pedido?.status === 'EM_PREPARO' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
+                          <p className="font-body-sm text-secondary mb-3">Destino: Chalé {pedido?.reserva?.quarto?.numero || 'N/A'} ({pedido?.reserva?.hospede?.nome || 'Hóspede'})</p>
+                          
+                          {/* A MÁGICA DO ALERTA PARA A COZINHA! Se tiver observação, pisca em vermelho */}
+                          {pedido.observacoes && (
+                             <div className="mb-4 inline-flex items-start gap-1.5 px-3 py-2 bg-error-container/40 border border-error/30 rounded-md max-w-sm">
+                                <AlertCircle size={16} className="text-error mt-0.5 flex-shrink-0" />
+                                <span className="text-xs font-bold text-error leading-tight">
+                                   Obs do Hóspede: {pedido.observacoes}
+                                </span>
+                             </div>
+                          )}
+
+                          <span className={`block w-max px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${pedido?.status === 'SOLICITADO' ? 'bg-orange-100 text-orange-800' : pedido?.status === 'EM_PREPARO' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
                             {pedido?.status ? pedido.status.replace('_', ' ') : 'PENDENTE'}
                           </span>
                         </div>
@@ -590,7 +628,6 @@ export default function App() {
                     )}
                   </div>
                 </div>
-
               </div>
             </div>
           )}
@@ -641,161 +678,314 @@ export default function App() {
             </div>
           )}
 
+          {/* ========================================================================= */}
+          {/* SPRINT 1: MÓDULO HÓSPEDE (O "FATOR UAU")                                  */}
+          {/* ========================================================================= */}
           {abaAtiva === 'portal-hospede' && (
-            <div className="flex flex-col gap-stack-lg max-w-[1000px] mx-auto pt-4">
+            <div className="flex flex-col gap-6 max-w-[1000px] mx-auto pt-4">
               
-              <header className="flex flex-col gap-stack-sm text-center md:text-left">
-                <h1 className="font-headline-lg text-[32px] md:text-[48px] text-on-surface leading-tight">Olá, {usuarioLogado?.nome?.split(' ')[0]}. Aproveite sua estadia.</h1>
-                <p className="font-body-lg text-secondary">Estamos felizes em tê-lo conosco. Abaixo você encontra os detalhes do seu chalé.</p>
+              <header className="flex flex-col gap-2 text-center md:text-left mb-2">
+                <h1 className="font-headline-lg text-[32px] md:text-[40px] text-on-surface leading-tight">Olá, {usuarioLogado?.nome?.split(' ')[0]}. Aproveite sua estadia.</h1>
+                <p className="font-body-lg text-secondary">Estamos felizes em tê-lo conosco. Acesse os serviços do seu chalé abaixo.</p>
               </header>
 
-              <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
-                <div className="bg-surface-container-lowest rounded-lg shadow-level-1 p-stack-md flex flex-col justify-between group hover:shadow-level-2 transition-shadow duration-300 ghost-border">
-                  <div className="flex items-start justify-between mb-stack-md border-b border-outline-variant/20 pb-stack-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary" data-icon="payments">payments</span>
-                      <h2 className="font-headline-md text-headline-md text-on-surface">Extrato do Chalé</h2>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-stack-sm flex-grow">
-                    <p className="font-body-md text-secondary">Saldo atual em consumo:</p>
-                    <p className="font-headline-lg text-[32px] text-on-surface">
-                      {extratoHospede && extratoHospede.temReserva ? formatarMoeda(extratoHospede.totalGeral) : 'R$ 0,00'}
-                    </p>
-                  </div>
-                  <button onClick={() => document.getElementById('detalhes-extrato')?.scrollIntoView({ behavior: 'smooth' })} className="mt-stack-md w-full py-3 px-4 rounded bg-primary-container text-on-primary-container font-label-md hover:brightness-95 transition-all cursor-pointer">
-                    Ver Detalhes
-                  </button>
-                </div>
-
-                <div className="bg-surface-container-lowest rounded-lg shadow-level-1 p-stack-md flex flex-col justify-between group hover:shadow-level-2 transition-shadow duration-300 ghost-border">
-                  <div className="flex items-start justify-between mb-stack-md border-b border-outline-variant/20 pb-stack-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary" data-icon="wifi">wifi</span>
-                      <h2 className="font-headline-md text-headline-md text-on-surface">Conectar Wi-Fi</h2>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2 flex-grow">
-                    <div className="flex justify-between items-center bg-surface p-3 rounded-lg border border-outline-variant/30">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wider text-secondary font-bold">Rede</p>
-                        <p className="font-headline-md text-base font-bold text-on-surface">Refugio Dourado cliente</p>
-                        <p className="text-[11px] uppercase tracking-wider text-secondary font-bold mt-2">Senha</p>
-                        <p className="font-headline-md text-base font-bold text-primary">bemvindo</p>
-                      </div>
-                      <div className="bg-white p-2 rounded-lg border border-outline-variant flex flex-col items-center justify-center shadow-sm">
-                        <QrCode size={48} className="text-on-surface" />
-                        <span className="text-[9px] text-secondary font-bold mt-1">Escanear</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-primary font-label-sm mt-1">
-                      <span className="w-2 h-2 rounded-full bg-green-500"></span> Status: Excelente
-                    </div>
-                  </div>
-                  <button onClick={() => { navigator.clipboard.writeText('bemvindo'); alert('Senha "bemvindo" copiada com sucesso!')}} className="mt-4 w-full py-2.5 px-4 rounded border ghost-border text-on-surface-variant font-label-md hover:bg-primary-container/10 transition-all flex items-center justify-center gap-2 cursor-pointer">
-                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>content_copy</span> Copiar Senha
-                  </button>
-                </div>
-
-                <div className="bg-surface-container-lowest rounded-lg shadow-level-1 p-stack-md flex flex-col justify-between group hover:shadow-level-2 transition-shadow duration-300 ghost-border">
-                  <div className="flex items-start justify-between mb-stack-md border-b border-outline-variant/20 pb-stack-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary" data-icon="restaurant">restaurant</span>
-                      <h2 className="font-headline-md text-headline-md text-on-surface">Cardápio Digital</h2>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-stack-sm flex-grow relative overflow-hidden rounded mb-stack-sm min-h-[120px]">
-                    <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1544025162-811114bd4157?q=80&w=800&auto=format&fit=crop')" }}></div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
-                    <div className="relative z-10 p-4 h-full flex items-end">
-                      <p className="font-body-md text-white">Descubra opções de gastronomia exclusiva.</p>
-                    </div>
-                  </div>
-                  <button onClick={() => document.getElementById('secao-cardapio')?.scrollIntoView({ behavior: 'smooth' })} className="mt-auto w-full py-3 px-4 rounded bg-primary-container text-on-primary-container font-label-md hover:brightness-95 transition-all cursor-pointer">
-                    Acessar Cardápio
-                  </button>
-                </div>
-              </section>
-
-              <section className="mt-stack-md flex flex-col gap-stack-md">
-                <h3 className="font-headline-md text-[24px] text-on-surface">Serviços Sugeridos para Você</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
-                  <div className="bg-surface-container-lowest rounded-lg shadow-level-1 p-4 flex items-center gap-4 cursor-pointer hover:bg-surface-container-low transition-colors ghost-border"><div className="w-12 h-12 rounded-full bg-primary-container/20 flex items-center justify-center text-primary"><span className="material-symbols-outlined">spa</span></div><div><h4 className="font-label-md text-on-surface">Massagem Relaxante</h4><p className="font-label-sm text-secondary mt-1">Agende na recepção</p></div></div>
-                  <div className="bg-surface-container-lowest rounded-lg shadow-level-1 p-4 flex items-center gap-4 cursor-pointer hover:bg-surface-container-low transition-colors ghost-border"><div className="w-12 h-12 rounded-full bg-primary-container/20 flex items-center justify-center text-primary"><span className="material-symbols-outlined">explore</span></div><div><h4 className="font-label-md text-on-surface">Passeio Guiado</h4><p className="font-label-sm text-secondary mt-1">Trilhas pela região</p></div></div>
-                  <div className="bg-surface-container-lowest rounded-lg shadow-level-1 p-4 flex items-center gap-4 cursor-pointer hover:bg-surface-container-low transition-colors ghost-border"><div className="w-12 h-12 rounded-full bg-primary-container/20 flex items-center justify-center text-primary"><span className="material-symbols-outlined">room_service</span></div><div><h4 className="font-label-md text-on-surface">Café no Quarto</h4><p className="font-label-sm text-secondary mt-1">Solicite pelo app</p></div></div>
-                  <div className="bg-surface-container-lowest rounded-lg shadow-level-1 p-4 flex items-center gap-4 cursor-pointer hover:bg-surface-container-low transition-colors ghost-border"><div className="w-12 h-12 rounded-full bg-primary-container/20 flex items-center justify-center text-primary"><span className="material-symbols-outlined">local_bar</span></div><div><h4 className="font-label-md text-on-surface">Degustação Vinhos</h4><p className="font-label-sm text-secondary mt-1">Consulte horários</p></div></div>
-                </div>
-              </section>
-
-              <hr className="my-8 border-outline-variant/30" />
-
-              <div id="detalhes-extrato" className="grid grid-cols-1 md:grid-cols-2 gap-gutter mb-8">
-                {extratoHospede && extratoHospede.temReserva && (
-                  <div className="bg-surface-container-lowest rounded-lg shadow-level-1 p-6 ghost-border">
-                    <h3 className="font-headline-md text-xl mb-4 border-b border-outline-variant/20 pb-2">📋 Detalhes da Conta</h3>
-                    <div className="flex justify-between mb-2 text-secondary"><span>Diárias ({extratoHospede.qtdDiarias}x)</span> <span>{formatarMoeda(extratoHospede.totalDiarias)}</span></div>
-                    {extratoHospede.consumos.length > 0 && <div className="mt-4 mb-2 font-bold text-sm text-on-surface">Consumo no Bar/Restaurante:</div>}
-                    {extratoHospede.consumos.map((c: any) => (
-                      <div key={c.id} className="flex justify-between text-sm text-secondary mb-1 border-b border-surface-container pb-1">
-                        <span>{c.quantidade}x {c.nome}</span> <span>{formatarMoeda(c.subtotal)}</span>
-                      </div>
-                    ))}
-                    <div className="flex justify-between items-center mt-4 pt-4 border-t border-outline-variant/30">
-                      <strong className="font-headline-md text-lg text-on-surface">Total Acumulado</strong>
-                      <strong className="font-headline-md text-xl text-primary">{formatarMoeda(extratoHospede.totalGeral)}</strong>
-                    </div>
-                  </div>
-                )}
-
-                {pedidosCozinha.filter((p: any) => p.status !== 'ENTREGUE' && p.status !== 'CANCELADO').length > 0 && (
-                  <div className="bg-primary-fixed-dim/10 rounded-lg shadow-level-1 p-6 border border-primary-container/30">
-                    <h3 className="font-headline-md text-xl mb-4 text-on-primary-container">🔔 Pedidos em Andamento</h3>
-                    {pedidosCozinha.filter((p: any) => p.status !== 'ENTREGUE' && p.status !== 'CANCELADO').map((pedido: any) => (
-                      <div key={pedido.id} className="flex justify-between items-center bg-white p-4 rounded-lg mb-2 shadow-sm">
-                        <span className="font-bold text-on-surface">{pedido.quantidade}x {pedido.produto.nome}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-primary-container/20 text-primary-fixed-variant uppercase">{pedido.status.replace('_', ' ')}</span>
-                          {pedido.status === 'SOLICITADO' && (
-                             <button onClick={() => cancelarPedido(pedido.id)} className="text-error hover:text-error/80 text-xs font-bold transition-colors cursor-pointer">Cancelar</button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              {/* MENU DE NAVEGAÇÃO INTERNA DO HÓSPEDE */}
+              <div className="flex gap-6 border-b border-outline-variant/50 overflow-x-auto no-scrollbar">
+                <button onClick={() => setAbaPortal('visao-geral')} className={`pb-3 font-label-md whitespace-nowrap transition-colors ${abaPortal === 'visao-geral' ? 'text-primary border-b-2 border-primary font-bold' : 'text-secondary hover:text-on-surface cursor-pointer'}`}>Resumo da Estadia</button>
+                <button onClick={() => setAbaPortal('guia')} className={`pb-3 font-label-md whitespace-nowrap transition-colors ${abaPortal === 'guia' ? 'text-primary border-b-2 border-primary font-bold' : 'text-secondary hover:text-on-surface cursor-pointer'}`}>Guia Majorlândia</button>
+                <button onClick={() => setAbaPortal('concierge')} className={`pb-3 font-label-md whitespace-nowrap transition-colors ${abaPortal === 'concierge' ? 'text-primary border-b-2 border-primary font-bold' : 'text-secondary hover:text-on-surface cursor-pointer'}`}>Concierge & Serviços</button>
+                <button onClick={() => setAbaPortal('preferencias')} className={`pb-3 font-label-md whitespace-nowrap transition-colors ${abaPortal === 'preferencias' ? 'text-primary border-b-2 border-primary font-bold' : 'text-secondary hover:text-on-surface cursor-pointer'}`}>Preferências</button>
               </div>
 
-              <section id="secao-cardapio" className="mt-4">
-                <h3 className="font-headline-md text-[24px] text-on-surface mb-6">Explore nosso Menu</h3>
-                <div className="relative mb-6">
-                  <Search size={20} className="absolute top-3.5 left-4 text-secondary" />
-                  <input type="text" placeholder="O que deseja pedir hoje?" value={termoBusca} onChange={(e) => setTermoBusca(e.target.value)} className="w-full pl-12 pr-4 py-3 rounded-full border border-outline-variant bg-surface outline-none focus:border-primary transition-colors font-body-md" />
-                </div>
-                <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar mb-4">
-                  {['TODOS', 'Prato Principal', 'Petiscos', 'Bebidas', 'Sobremesas'].map((cat) => (
-                    <button key={cat} onClick={() => setCategoriaFiltro(cat)} className={`px-5 py-2 rounded-full font-label-md transition-colors whitespace-nowrap cursor-pointer ${categoriaFiltro === cat ? 'bg-primary-container text-white border-transparent' : 'bg-surface-container-lowest text-secondary border border-outline-variant hover:bg-surface-container'}`}>
-                      {cat === 'TODOS' ? '✨ Cardápio Completo' : cat}
-                    </button>
-                  ))}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                  {produtos.filter((p: any) => {
-                      const norm = (t: string) => t ? t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase() : '';
-                      return norm(p.nome).includes(norm(termoBusca)) && (categoriaFiltro === 'TODOS' || p.categoria === categoriaFiltro);
-                    }).map(p => (
-                      <div key={p.id} className="bg-surface-container-lowest rounded-xl shadow-level-1 p-5 ghost-border flex flex-col justify-between hover:shadow-level-2 transition-all group">
-                        <div className="mb-4">
-                          <span className="text-[10px] uppercase font-bold text-primary tracking-wider">{p.categoria || 'Geral'}</span>
-                          <h3 className="font-headline-md text-lg text-on-surface mt-1 mb-2">{p.nome}</h3>
-                          <p className="text-xl font-bold text-surface-tint">{formatarMoeda(p.preco)}</p>
+              {/* ABA 1: VISÃO GERAL (Extrato, Cardápio, Timeline de Pedidos) */}
+              {abaPortal === 'visao-geral' && (
+                <div className="flex flex-col gap-6">
+                  {/* Cards de Resumo */}
+                  <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="bg-surface-container-lowest rounded-lg shadow-level-1 p-6 flex flex-col justify-between group hover:shadow-level-2 transition-shadow duration-300 ghost-border">
+                      <div className="flex items-start justify-between mb-4 border-b border-outline-variant/20 pb-2">
+                        <div className="flex items-center gap-2"><span className="material-symbols-outlined text-primary" data-icon="payments">payments</span><h2 className="font-headline-md text-base text-on-surface">Extrato do Chalé</h2></div>
+                      </div>
+                      <div className="flex flex-col gap-2 flex-grow">
+                        <p className="font-body-md text-secondary text-sm">Saldo atual em consumo:</p>
+                        <p className="font-headline-lg text-[28px] text-on-surface">{extratoHospede && extratoHospede.temReserva ? formatarMoeda(extratoHospede.totalGeral) : 'R$ 0,00'}</p>
+                      </div>
+                      <button onClick={() => document.getElementById('detalhes-extrato')?.scrollIntoView({ behavior: 'smooth' })} className="mt-4 w-full py-2.5 px-4 rounded bg-primary-container text-on-primary-container font-label-md hover:brightness-95 transition-all cursor-pointer">Ver Detalhes</button>
+                    </div>
+
+                    <div className="bg-surface-container-lowest rounded-lg shadow-level-1 p-6 flex flex-col justify-between group hover:shadow-level-2 transition-shadow duration-300 ghost-border">
+                      <div className="flex items-start justify-between mb-4 border-b border-outline-variant/20 pb-2">
+                        <div className="flex items-center gap-2"><span className="material-symbols-outlined text-primary" data-icon="wifi">wifi</span><h2 className="font-headline-md text-base text-on-surface">Conectar Wi-Fi</h2></div>
+                      </div>
+                      <div className="flex flex-col gap-2 flex-grow">
+                        <div className="flex justify-between items-center bg-surface p-3 rounded-lg border border-outline-variant/30">
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-secondary font-bold">Rede</p>
+                            <p className="font-headline-md text-sm font-bold text-on-surface">Refugio_Hospedes</p>
+                            <p className="text-[10px] uppercase tracking-wider text-secondary font-bold mt-2">Senha</p>
+                            <p className="font-headline-md text-sm font-bold text-primary">bemvindo</p>
+                          </div>
+                          <div className="bg-white p-2 rounded-lg border border-outline-variant flex flex-col items-center justify-center shadow-sm"><QrCode size={36} className="text-on-surface" /></div>
                         </div>
-                        <button onClick={() => pedirComoHospede(p.id)} className="w-full py-2.5 rounded-lg bg-surface border border-primary text-primary font-label-md flex items-center justify-center gap-2 hover:bg-primary-container hover:text-white transition-colors cursor-pointer">
-                          <ShoppingBag size={16} /> Pedir
+                      </div>
+                      <button onClick={() => { navigator.clipboard.writeText('bemvindo'); alert('Senha copiada com sucesso!')}} className="mt-4 w-full py-2.5 px-4 rounded border ghost-border text-on-surface-variant font-label-md hover:bg-primary-container/10 transition-all cursor-pointer">Copiar Senha</button>
+                    </div>
+
+                    <div className="bg-surface-container-lowest rounded-lg shadow-level-1 p-6 flex flex-col justify-between group hover:shadow-level-2 transition-shadow duration-300 ghost-border">
+                      <div className="flex items-start justify-between mb-4 border-b border-outline-variant/20 pb-2">
+                        <div className="flex items-center gap-2"><span className="material-symbols-outlined text-primary" data-icon="restaurant">restaurant</span><h2 className="font-headline-md text-base text-on-surface">Cardápio Digital</h2></div>
+                      </div>
+                      <div className="flex flex-col gap-2 flex-grow relative overflow-hidden rounded mb-2 min-h-[100px]">
+                        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1544025162-811114bd4157?q=80&w=800&auto=format&fit=crop')" }}></div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
+                        <div className="relative z-10 p-3 h-full flex items-end"><p className="font-body-md text-white text-sm">Opções exclusivas de gastronomia.</p></div>
+                      </div>
+                      <button onClick={() => document.getElementById('secao-cardapio')?.scrollIntoView({ behavior: 'smooth' })} className="mt-auto w-full py-2.5 px-4 rounded bg-primary-container text-on-primary-container font-label-md hover:brightness-95 transition-all cursor-pointer">Acessar Cardápio</button>
+                    </div>
+                  </section>
+
+                  {/* TIMELINE DE PEDIDOS EM TEMPO REAL (SPRINT 1) */}
+                  {pedidosCozinha.filter((p: any) => p.status !== 'ENTREGUE' && p.status !== 'CANCELADO').length > 0 && (
+                    <section className="mt-4">
+                      <h3 className="font-headline-md text-xl mb-4 text-on-surface">Acompanhamento de Pedidos</h3>
+                      {pedidosCozinha.filter((p: any) => p.status !== 'ENTREGUE' && p.status !== 'CANCELADO').map((pedido: any) => {
+                         const isPreparo = pedido.status === 'EM_PREPARO';
+                         const isPronto = pedido.status === 'PRONTO';
+                         
+                         return (
+                            <div key={pedido.id} className="bg-white p-6 rounded-xl shadow-level-1 ghost-border mb-4">
+                               <div className="flex justify-between items-start mb-8">
+                                  <div>
+                                     <span className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1 block">Pedido #{pedido.id.substring(0,6)}</span>
+                                     <h4 className="font-headline-md text-lg text-on-surface">{pedido.quantidade}x {pedido.produto.nome}</h4>
+                                  </div>
+                                  {pedido.status === 'SOLICITADO' && <button onClick={() => cancelarPedido(pedido.id)} className="text-error hover:bg-error-container px-3 py-1 rounded text-xs font-bold transition-colors cursor-pointer border border-error/30">Cancelar</button>}
+                               </div>
+
+                               {/* A Mágica da Linha do Tempo */}
+                               <div className="relative flex justify-between items-center max-w-md mx-auto px-4 sm:px-8">
+                                  {/* Barra Cinza (Fundo) */}
+                                  <div className="absolute top-4 left-12 right-12 h-1 bg-surface-container z-0"></div>
+                                  {/* Barra Dourada (Progresso) */}
+                                  <div className="absolute top-4 left-12 h-1 bg-primary z-0 transition-all duration-700" style={{ width: isPronto ? 'calc(100% - 6rem)' : isPreparo ? '50%' : '0%' }}></div>
+                                  
+                                  {/* Step 1: Recebido */}
+                                  <div className="relative z-10 flex flex-col items-center gap-2">
+                                     <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center shadow-sm"><Check size={16}/></div>
+                                     <span className="text-[11px] font-bold text-on-surface">Recebido</span>
+                                  </div>
+
+                                  {/* Step 2: Em Preparo */}
+                                  <div className="relative z-10 flex flex-col items-center gap-2">
+                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-500 shadow-sm ${isPreparo || isPronto ? 'bg-primary text-white' : 'bg-surface border-2 border-outline-variant text-secondary'}`}><Utensils size={14}/></div>
+                                     <span className={`text-[11px] font-bold ${isPreparo || isPronto ? 'text-on-surface' : 'text-secondary'}`}>Em Preparo</span>
+                                  </div>
+
+                                  {/* Step 3: A Caminho */}
+                                  <div className="relative z-10 flex flex-col items-center gap-2">
+                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-500 shadow-sm ${isPronto ? 'bg-primary text-white' : 'bg-surface border-2 border-outline-variant text-secondary'}`}><Clock size={14}/></div>
+                                     <span className={`text-[11px] font-bold ${isPronto ? 'text-on-surface' : 'text-secondary'}`}>A Caminho</span>
+                                  </div>
+                               </div>
+                            </div>
+                         )
+                      })}
+                    </section>
+                  )}
+
+                  {/* Cardápio Digital Completo */}
+                  <section id="secao-cardapio" className="mt-4 border-t border-outline-variant/30 pt-8">
+                    <h3 className="font-headline-md text-2xl text-on-surface mb-6">Explore nosso Menu</h3>
+                    <div className="relative mb-6">
+                      <Search size={20} className="absolute top-3.5 left-4 text-secondary" />
+                      <input type="text" placeholder="O que deseja pedir hoje?" value={termoBusca} onChange={(e) => setTermoBusca(e.target.value)} className="w-full pl-12 pr-4 py-3 rounded-full border border-outline-variant bg-surface outline-none focus:border-primary transition-colors font-body-md shadow-sm" />
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar mb-4">
+                      {['TODOS', 'Prato Principal', 'Petiscos', 'Bebidas', 'Sobremesas'].map((cat) => (
+                        <button key={cat} onClick={() => setCategoriaFiltro(cat)} className={`px-5 py-2 rounded-full font-label-md transition-colors whitespace-nowrap cursor-pointer ${categoriaFiltro === cat ? 'bg-primary-container text-white border-transparent shadow-sm' : 'bg-surface-container-lowest text-secondary border border-outline-variant hover:bg-surface-container'}`}>
+                          {cat === 'TODOS' ? '✨ Cardápio Completo' : cat}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                      {produtos.filter((p: any) => {
+                          const norm = (t: string) => t ? t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase() : '';
+                          return norm(p.nome).includes(norm(termoBusca)) && (categoriaFiltro === 'TODOS' || p.categoria === categoriaFiltro);
+                        }).map(p => (
+                          <div key={p.id} className="bg-surface-container-lowest rounded-xl shadow-level-1 p-5 ghost-border flex flex-col justify-between hover:shadow-level-2 transition-all group">
+                            <div className="mb-4">
+                              <span className="text-[10px] uppercase font-bold text-primary tracking-wider">{p.categoria || 'Geral'}</span>
+                              <h3 className="font-headline-md text-lg text-on-surface mt-1 mb-2">{p.nome}</h3>
+                              <p className="text-xl font-bold text-surface-tint">{formatarMoeda(p.preco)}</p>
+                            </div>
+                            <button onClick={() => pedirComoHospede(p.id)} className="w-full py-2.5 rounded-lg bg-surface border border-primary text-primary font-label-md flex items-center justify-center gap-2 hover:bg-primary-container hover:text-white transition-colors cursor-pointer">
+                              <ShoppingBag size={16} /> Fazer Pedido
+                            </button>
+                          </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  {/* Extrato Detalhado */}
+                  {extratoHospede && extratoHospede.temReserva && (
+                    <div id="detalhes-extrato" className="bg-surface-container-lowest rounded-xl shadow-level-1 p-6 ghost-border mt-4">
+                      <h3 className="font-headline-md text-xl mb-4 border-b border-outline-variant/20 pb-2">📋 Detalhes da Conta</h3>
+                      <div className="flex justify-between mb-2 text-secondary"><span>Diárias ({extratoHospede.qtdDiarias}x)</span> <span>{formatarMoeda(extratoHospede.totalDiarias)}</span></div>
+                      {extratoHospede.consumos.length > 0 && <div className="mt-4 mb-2 font-bold text-sm text-on-surface">Consumo no Bar/Restaurante:</div>}
+                      {extratoHospede.consumos.map((c: any) => (
+                        <div key={c.id} className="flex justify-between text-sm text-secondary mb-1 border-b border-surface-container pb-1">
+                          <span>{c.quantidade}x {c.nome}</span> <span>{formatarMoeda(c.subtotal)}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between items-center mt-4 pt-4 border-t border-outline-variant/30">
+                        <strong className="font-headline-md text-lg text-on-surface">Total Acumulado</strong>
+                        <strong className="font-headline-md text-xl text-primary">{formatarMoeda(extratoHospede.totalGeral)}</strong>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ABA 2: GUIA MAJORLÂNDIA */}
+              {abaPortal === 'guia' && (
+                <div className="flex flex-col gap-6 animate-fade-in">
+                  <div className="bg-primary-container/10 p-6 rounded-xl border border-primary-container/20">
+                    <h2 className="font-headline-lg text-2xl text-on-surface mb-2">Descubra Majorlândia</h2>
+                    <p className="text-secondary font-body-md">Bem-vindo ao coração do Ceará. Explore as falésias de areias coloridas e a brisa constante que fazem desta região um verdadeiro refúgio.</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-surface-container-lowest rounded-xl shadow-level-1 overflow-hidden group ghost-border">
+                      <div className="h-48 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1590523277543-a94d2e4eb00b?q=80&w=800')" }}></div>
+                      <div className="p-5">
+                        <h3 className="font-headline-md text-lg text-on-surface mb-2">Praia de Majorlândia</h3>
+                        <p className="text-sm text-secondary mb-4">Famosa por suas areias coloridas que inspiram o artesanato local. Um mar tranquilo, perfeito para relaxar ao entardecer.</p>
+                        <button className="text-primary font-bold text-sm flex items-center gap-1 hover:underline cursor-pointer">Ver rota <ChevronRight size={16}/></button>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-surface-container-lowest rounded-xl shadow-level-1 overflow-hidden group ghost-border">
+                      <div className="h-48 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1533561797500-4bad4728594e?q=80&w=800')" }}></div>
+                      <div className="p-5">
+                        <h3 className="font-headline-md text-lg text-on-surface mb-2">Passeio de Buggy</h3>
+                        <p className="text-sm text-secondary mb-4">Aventure-se pelas dunas douradas e descubra lagoas escondidas. Uma experiência com ou sem emoção, você escolhe!</p>
+                        <button className="text-primary font-bold text-sm flex items-center gap-1 hover:underline cursor-pointer">Agendar passeio <ChevronRight size={16}/></button>
+                      </div>
+                    </div>
+
+                    <div className="bg-surface-container-lowest rounded-xl shadow-level-1 overflow-hidden group ghost-border">
+                      <div className="h-48 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1544025162-811114bd4157?q=80&w=800')" }}></div>
+                      <div className="p-5">
+                        <h3 className="font-headline-md text-lg text-on-surface mb-2">Gastronomia Costeira</h3>
+                        <p className="text-sm text-secondary mb-4">Saboreie peixes frescos e mariscos nas tradicionais barracas de praia, acompanhados de uma água de coco bem gelada.</p>
+                        <button className="text-primary font-bold text-sm flex items-center gap-1 hover:underline cursor-pointer">Ver recomendações <ChevronRight size={16}/></button>
+                      </div>
+                    </div>
+
+                    <div className="bg-surface-container-lowest rounded-xl shadow-level-1 overflow-hidden group ghost-border">
+                      <div className="h-48 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?q=80&w=800')" }}></div>
+                      <div className="p-5">
+                        <h3 className="font-headline-md text-lg text-on-surface mb-2">Centro de Artesanato</h3>
+                        <p className="text-sm text-secondary mb-4">Conheça a arte secular das garrafinhas de areia colorida. Uma lembrança inesquecível feita pelas mãos dos moradores.</p>
+                        <button className="text-primary font-bold text-sm flex items-center gap-1 hover:underline cursor-pointer">Como chegar <ChevronRight size={16}/></button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ABA 3: CONCIERGE & SOLICITAÇÕES */}
+              {abaPortal === 'concierge' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+                  <div className="bg-surface-container-lowest p-6 rounded-xl shadow-level-1 ghost-border">
+                      <h3 className="font-headline-md text-xl mb-6">Solicitações Rápidas</h3>
+                      <div className="flex flex-col gap-4">
+                        <div className="flex items-center justify-between p-4 border border-outline-variant/50 rounded-lg hover:border-primary/30 transition-colors bg-[#faf9f6]">
+                            <div><h4 className="font-bold text-sm text-on-surface">Toalhas Extras</h4><p className="text-xs text-secondary mt-0.5">Jogo de banho completo</p></div>
+                            <button onClick={() => alert('Solicitação enviada para a Governança!')} className="px-5 py-2.5 bg-primary-container text-primary-fixed-variant text-xs font-bold rounded-lg hover:brightness-95 cursor-pointer">Solicitar</button>
+                        </div>
+                        <div className="flex items-center justify-between p-4 border border-outline-variant/50 rounded-lg hover:border-primary/30 transition-colors bg-[#faf9f6]">
+                            <div><h4 className="font-bold text-sm text-on-surface">Reposição Frigobar</h4><p className="text-xs text-secondary mt-0.5">Água, sucos e snacks</p></div>
+                            <button onClick={() => alert('Solicitação enviada para o Restaurante!')} className="px-5 py-2.5 bg-primary-container text-primary-fixed-variant text-xs font-bold rounded-lg hover:brightness-95 cursor-pointer">Solicitar</button>
+                        </div>
+                        <div className="flex items-center justify-between p-4 border border-outline-variant/50 rounded-lg hover:border-primary/30 transition-colors bg-[#faf9f6]">
+                            <div><h4 className="font-bold text-sm text-on-surface">Limpeza do Quarto</h4><p className="text-xs text-secondary mt-0.5">Arrumação e higienização</p></div>
+                            <button onClick={() => alert('Arrumação agendada com a equipe!')} className="px-5 py-2.5 bg-primary-container text-primary-fixed-variant text-xs font-bold rounded-lg hover:brightness-95 cursor-pointer">Solicitar</button>
+                        </div>
+                      </div>
+                  </div>
+
+                  <div className="bg-surface-container-lowest p-6 rounded-xl shadow-level-1 ghost-border flex flex-col h-full">
+                      <h3 className="font-headline-md text-xl mb-2 flex items-center gap-2"><MessageSquare size={20} className="text-primary"/> Falar com a Recepção</h3>
+                      <p className="text-sm text-secondary mb-6">Precisa de algo específico ou tem alguma dúvida? Envie uma mensagem direta para nossa equipe.</p>
+                      
+                      <div className="flex-1 flex flex-col gap-3">
+                        <textarea rows={4} placeholder="Ex: Gostaria de agendar o SPA para amanhã às 14h..." className="w-full p-4 rounded-xl border border-outline-variant bg-[#faf9f6] outline-none focus:border-primary resize-none text-sm text-on-surface font-body-md"></textarea>
+                        <button onClick={() => alert('Mensagem enviada com sucesso! A recepção responderá em breve.')} className="w-full py-3.5 bg-primary text-white font-label-md font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm hover:brightness-95 cursor-pointer mt-auto">
+                          Enviar Mensagem
                         </button>
                       </div>
-                  ))}
+                  </div>
                 </div>
-              </section>
+              )}
+
+              {/* ABA 4: PREFERÊNCIAS */}
+              {abaPortal === 'preferencias' && (
+                <div className="bg-surface-container-lowest p-6 md:p-8 rounded-xl shadow-level-1 ghost-border animate-fade-in max-w-3xl">
+                  <h3 className="font-headline-md text-2xl mb-2 text-on-surface">Personalize sua Estadia</h3>
+                  <p className="text-secondary font-body-md mb-8">Nós cuidamos dos detalhes para que você se sinta em casa.</p>
+                  
+                  <div className="mb-8">
+                    <label className="font-bold text-sm text-on-surface flex items-center gap-2 mb-4"><Flame size={18} className="text-primary"/> Restrições Alimentares</label>
+                    <div className="flex flex-wrap gap-6 mb-4">
+                      <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer"><input type="checkbox" className="w-4 h-4 accent-primary cursor-pointer" /> Vegetariano</label>
+                      <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer"><input type="checkbox" className="w-4 h-4 accent-primary cursor-pointer" /> Sem Glúten</label>
+                      <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer"><input type="checkbox" className="w-4 h-4 accent-primary cursor-pointer" /> Sem Lactose</label>
+                      <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer"><input type="checkbox" className="w-4 h-4 accent-primary cursor-pointer" /> Vegano</label>
+                    </div>
+                    {/* CAIXA DE TEXTO DAS RESTRIÇÕES (Que agora vai para a cozinha!) */}
+                    <textarea 
+                      placeholder="Outras restrições ou alergias? (Ex: sem pimenta, sem nozes, alergia a camarão...)" 
+                      value={outrasRestricoes}
+                      onChange={(e) => setOutrasRestricoes(e.target.value)}
+                      className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-sm text-on-surface resize-none"
+                      rows={2}
+                    ></textarea>
+                    <p className="text-[10px] text-secondary mt-1 ml-1">* O que você escrever aqui será enviado como alerta para o Chef na hora do seu pedido.</p>
+                  </div>
+
+                  <hr className="border-outline-variant/30 mb-8" />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                      <div>
+                        <label className="font-bold text-sm text-on-surface flex items-center gap-2 mb-4"><Thermometer size={18} className="text-primary"/> Temperatura Ideal do Quarto</label>
+                        <input type="range" min="16" max="28" value={prefTemp} onChange={e => setPrefTemp(Number(e.target.value))} className="w-full accent-primary cursor-pointer" />
+                        <div className="flex justify-between text-xs text-secondary font-bold mt-2">
+                          <span>16°C</span> 
+                          <span className="text-primary text-lg px-3 py-1 bg-primary-container/20 rounded-md">{prefTemp}°C</span> 
+                          <span>28°C</span>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="font-bold text-sm text-on-surface flex items-center gap-2 mb-4"><Wind size={18} className="text-primary"/> Preferência de Travesseiro</label>
+                        <select className="w-full p-3.5 rounded-xl border border-outline-variant bg-[#faf9f6] outline-none focus:border-primary text-sm text-secondary cursor-pointer">
+                          <option>Plumas de Ganso (Padrão)</option>
+                          <option>Viscoelástico (Nasa)</option>
+                          <option>Espuma Firme</option>
+                          <option>Hipoalergênico</option>
+                        </select>
+                      </div>
+                  </div>
+
+                  <div className="mt-10 flex justify-end">
+                     <button onClick={() => alert('Preferências salvas! Nossa equipe já foi notificada.')} className="px-8 py-3 bg-[#c5a059] text-white font-label-md font-bold rounded-lg hover:brightness-95 transition-all shadow-sm cursor-pointer">
+                        Salvar Minhas Preferências
+                     </button>
+                  </div>
+                </div>
+              )}
+
             </div>
           )}
 
@@ -807,32 +997,25 @@ export default function App() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-1 bg-surface-container-lowest rounded-xl shadow-level-1 p-8 ghost-border flex flex-col items-center text-center self-start">
                   <div className="w-32 h-32 rounded-full overflow-hidden mb-5 border-4 border-surface shadow-sm">
-                    <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=256&auto=format&fit=crop" alt="Foto de Perfil" className="w-full h-full object-cover" />
+                    <img src={fotoPerfil} alt="Foto de Perfil" className="w-full h-full object-cover" />
                   </div>
                   <h2 className="font-headline-md text-xl text-on-surface font-bold">{usuarioLogado?.nome || 'Administrador'}</h2>
                   <p className="text-secondary font-body-md mb-6">{usuarioLogado?.cargo === 'GERENTE' ? 'Administrador Geral' : usuarioLogado?.cargo || 'Membro da Equipe'}</p>
-                  <button className="w-full py-2.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-md font-bold hover:bg-surface-container transition-colors cursor-pointer">
+                  
+                  <label className="w-full py-2.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-md font-bold hover:bg-surface-container transition-colors cursor-pointer text-center block">
                     Alterar Foto
-                  </button>
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files && e.target.files[0]) { setFotoPerfil(URL.createObjectURL(e.target.files[0])); } }} />
+                  </label>
                 </div>
 
                 <div className="lg:col-span-2 flex flex-col gap-6">
                   <div className="bg-surface-container-lowest rounded-xl shadow-level-1 p-6 lg:p-8 ghost-border">
                     <h3 className="font-headline-md text-xl text-on-surface mb-6 font-bold">Informações Pessoais</h3>
                     <div className="flex flex-col gap-5">
-                      <div>
-                        <label className="text-xs font-bold text-secondary mb-1 block">Nome Completo</label>
-                        <input type="text" value={perfilNome} onChange={e => setPerfilNome(e.target.value)} className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" />
-                      </div>
+                      <div><label className="text-xs font-bold text-secondary mb-1 block">Nome Completo</label><input type="text" value={perfilNome} onChange={e => setPerfilNome(e.target.value)} className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" /></div>
                       <div className="flex flex-col md:flex-row gap-5">
-                        <div className="flex-1">
-                          <label className="text-xs font-bold text-secondary mb-1 block">Email Corporativo</label>
-                          <input type="email" value={perfilEmail} onChange={e => setPerfilEmail(e.target.value)} className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" />
-                        </div>
-                        <div className="flex-1">
-                          <label className="text-xs font-bold text-secondary mb-1 block">Telefone</label>
-                          <input type="text" value={perfilTelefone} onChange={e => setPerfilTelefone(e.target.value)} className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" />
-                        </div>
+                        <div className="flex-1"><label className="text-xs font-bold text-secondary mb-1 block">Email Corporativo</label><input type="email" value={perfilEmail} onChange={e => setPerfilEmail(e.target.value)} className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" /></div>
+                        <div className="flex-1"><label className="text-xs font-bold text-secondary mb-1 block">Telefone</label><input type="text" value={perfilTelefone} onChange={e => setPerfilTelefone(e.target.value)} className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" /></div>
                       </div>
                     </div>
                   </div>
@@ -840,66 +1023,33 @@ export default function App() {
                   <div className="bg-surface-container-lowest rounded-xl shadow-level-1 p-6 lg:p-8 ghost-border">
                     <h3 className="font-headline-md text-xl text-on-surface mb-6 font-bold">Segurança</h3>
                     <div className="flex flex-col gap-5">
-                      <div>
-                        <label className="text-xs font-bold text-secondary mb-1 block">Senha Atual</label>
-                        <input type="password" placeholder="••••••••" className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" />
-                      </div>
+                      <div><label className="text-xs font-bold text-secondary mb-1 block">Senha Atual</label><input type="password" placeholder="••••••••" className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" /></div>
                       <div className="flex flex-col md:flex-row gap-5">
-                        <div className="flex-1">
-                          <label className="text-xs font-bold text-secondary mb-1 block">Nova Senha</label>
-                          <input type="password" placeholder="Sua nova senha" className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" />
-                        </div>
-                        <div className="flex-1">
-                          <label className="text-xs font-bold text-secondary mb-1 block">Confirmar Nova Senha</label>
-                          <input type="password" placeholder="Confirme a nova senha" className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" />
-                        </div>
+                        <div className="flex-1"><label className="text-xs font-bold text-secondary mb-1 block">Nova Senha</label><input type="password" placeholder="Sua nova senha" className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" /></div>
+                        <div className="flex-1"><label className="text-xs font-bold text-secondary mb-1 block">Confirmar Nova Senha</label><input type="password" placeholder="Confirme a nova senha" className="w-full p-3 rounded-lg border border-outline-variant/50 bg-[#faf9f6] outline-none focus:border-primary transition-colors text-on-surface" /></div>
                       </div>
                     </div>
                   </div>
 
                   <div className="bg-surface-container-lowest rounded-xl shadow-level-1 p-6 lg:p-8 ghost-border">
-                    <h3 className="font-headline-md text-xl text-on-surface mb-6 font-bold">Preferências</h3>
+                    <h3 className="font-headline-md text-xl text-on-surface mb-6 font-bold">Preferências de Notificação</h3>
                     <div className="flex flex-col gap-6">
-                      
                       <div className="flex justify-between items-center gap-4">
-                        <div>
-                          <h4 className="font-label-md text-on-surface text-base">Notificações por Email</h4>
-                          <p className="font-body-sm text-secondary text-sm mt-0.5">Receber atualizações gerais e comunicados do sistema.</p>
-                        </div>
-                        <button onClick={() => setNotificacoesEmail(!notificacoesEmail)} className={`w-12 h-6 flex-shrink-0 rounded-full flex items-center p-1 transition-colors cursor-pointer ${notificacoesEmail ? 'bg-[#c5a059]' : 'bg-outline-variant/50'}`}>
-                          <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-300 ${notificacoesEmail ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                        </button>
+                        <div><h4 className="font-label-md text-on-surface text-base">Notificações por Email</h4><p className="font-body-sm text-secondary text-sm mt-0.5">Receber atualizações gerais e comunicados.</p></div>
+                        <button onClick={() => setNotificacoesEmail(!notificacoesEmail)} className={`w-12 h-6 flex-shrink-0 rounded-full flex items-center p-1 transition-colors cursor-pointer ${notificacoesEmail ? 'bg-[#c5a059]' : 'bg-outline-variant/50'}`}><div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-300 ${notificacoesEmail ? 'translate-x-6' : 'translate-x-0'}`}></div></button>
                       </div>
-
                       <div className="flex justify-between items-center gap-4">
-                        <div>
-                          <h4 className="font-label-md text-on-surface text-base">Alertas de Reserva</h4>
-                          <p className="font-body-sm text-secondary text-sm mt-0.5">Seja notificado imediatamente sobre novas reservas ou cancelamentos.</p>
-                        </div>
-                        <button onClick={() => setAlertasReserva(!alertasReserva)} className={`w-12 h-6 flex-shrink-0 rounded-full flex items-center p-1 transition-colors cursor-pointer ${alertasReserva ? 'bg-[#c5a059]' : 'bg-outline-variant/50'}`}>
-                          <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-300 ${alertasReserva ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                        </button>
+                        <div><h4 className="font-label-md text-on-surface text-base">Alertas de Reserva</h4><p className="font-body-sm text-secondary text-sm mt-0.5">Notificação sobre novas reservas ou cancelamentos.</p></div>
+                        <button onClick={() => setAlertasReserva(!alertasReserva)} className={`w-12 h-6 flex-shrink-0 rounded-full flex items-center p-1 transition-colors cursor-pointer ${alertasReserva ? 'bg-[#c5a059]' : 'bg-outline-variant/50'}`}><div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-300 ${alertasReserva ? 'translate-x-6' : 'translate-x-0'}`}></div></button>
                       </div>
-
-                      <div className="flex justify-between items-center gap-4">
-                        <div>
-                          <h4 className="font-label-md text-on-surface text-base">Relatórios Semanais</h4>
-                          <p className="font-body-sm text-secondary text-sm mt-0.5">Receba um resumo de desempenho financeiro e ocupação toda segunda-feira.</p>
-                        </div>
-                        <button onClick={() => setRelatoriosSemanais(!relatoriosSemanais)} className={`w-12 h-6 flex-shrink-0 rounded-full flex items-center p-1 transition-colors cursor-pointer ${relatoriosSemanais ? 'bg-[#c5a059]' : 'bg-outline-variant/50'}`}>
-                          <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-300 ${relatoriosSemanais ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                        </button>
-                      </div>
-
                     </div>
                   </div>
 
                   <div className="flex justify-end mt-2 mb-8">
-                    <button onClick={() => alert('Configurações salvas com sucesso!')} className="px-8 py-3 bg-[#c5a059] text-white font-label-md font-bold rounded-lg hover:brightness-95 transition-all shadow-sm cursor-pointer">
+                    <button onClick={() => alert('Configurações salvas!')} className="px-8 py-3 bg-[#c5a059] text-white font-label-md font-bold rounded-lg hover:brightness-95 transition-all shadow-sm cursor-pointer">
                       Salvar Alterações
                     </button>
                   </div>
-
                 </div>
               </div>
             </div>

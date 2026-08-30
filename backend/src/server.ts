@@ -270,7 +270,9 @@ app.post('/api/produtos', async (req: Request, res: Response) => {
 });
 
 app.post('/api/consumos', async (req: Request, res: Response) => {
-  const { reservaId, produtoId, quantidade } = req.body;
+  // 1. Adicionamos 'observacoes' aqui para pegar o texto que vem do React
+  const { reservaId, produtoId, quantidade, observacoes } = req.body; 
+  
   try {
     const produto = await prisma.produto.findUnique({ where: { id: produtoId } });
     if (!produto) return res.status(404).json({ error: 'Produto não encontrado' });
@@ -278,10 +280,18 @@ app.post('/api/consumos', async (req: Request, res: Response) => {
     const subtotal = produto.preco * Number(quantidade);
 
     const consumo = await prisma.consumo.create({
-      data: { reservaId, produtoId, quantidade: Number(quantidade), subtotal }
+      data: { 
+        reservaId, 
+        produtoId, 
+        quantidade: Number(quantidade), 
+        subtotal,
+        observacoes // 2. Mandamos salvar a observação no banco de dados!
+      }
     });
+    
     res.status(201).json(consumo);
   } catch (error) {
+    console.error("ERRO AO SALVAR PEDIDO NA COZINHA:", error);
     res.status(500).json({ error: 'Erro ao lançar consumo.' });
   }
 });
