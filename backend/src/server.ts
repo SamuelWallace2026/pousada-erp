@@ -150,6 +150,57 @@ app.post('/api/hospedes', async (req: Request, res: Response) => {
   }
 });
 
+// =========================================================================
+// ROTAS DE OPERAÇÕES (CRIADAS PELO PORTAL DO HÓSPEDE)
+// =========================================================================
+
+// POST: Criar nova tarefa de limpeza/solicitação rápida
+app.post('/api/operacoes/limpeza', async (req, res) => {
+  try {
+    const { quarto, tipo, observacao, status, urgente } = req.body;
+
+    // Salvando no banco de dados com Prisma
+    const novaTarefa = await prisma.tarefaLimpeza.create({
+      data: {
+        quarto,
+        tipo,
+        observacao: observacao || '',
+        status: status || 'Sujo',
+        urgente: urgente || false,
+      }
+    });
+
+    res.status(201).json(novaTarefa);
+  } catch (error) {
+    console.error('Erro ao criar tarefa de limpeza:', error);
+    res.status(500).json({ error: 'Erro interno ao criar tarefa de limpeza.' });
+  }
+});
+
+// POST: Criar novo chamado de reparo/manutenção
+app.post('/api/operacoes/reparos', async (req, res) => {
+  try {
+    const { local, descricao, prioridade, status, hospedeEnvolvido } = req.body;
+
+    // Salvando no banco de dados com Prisma
+    const novoChamado = await prisma.chamadoManutencao.create({
+      data: {
+        local,
+        descricao,
+        prioridade: prioridade || 'Média',
+        tempoEspera: 'Agora', // Define o tempo inicial como Agora
+        status: status || 'Pendente',
+        hospedeEnvolvido: hospedeEnvolvido || null,
+      }
+    });
+
+    res.status(201).json(novoChamado);
+  } catch (error) {
+    console.error('Erro ao criar chamado de manutenção:', error);
+    res.status(500).json({ error: 'Erro interno ao criar chamado de manutenção.' });
+  }
+});
+
 // ==========================================
 // MÓDULO 3: GESTÃO DE ACOMODAÇÕES (QUARTOS)
 // ==========================================
@@ -615,6 +666,46 @@ app.put('/api/operacoes/reparos/:id/status', async (req, res) => {
     });
     res.json(chamado);
   } catch (error) { res.status(500).json({ error: 'Erro ao atualizar chamado' }); }
+});
+
+// ==========================================
+// MÓDULO 10: MENSAGENS (CHAT DA RECEPÇÃO)
+// ==========================================
+
+// Hóspede enviando mensagem
+app.post('/api/mensagens', async (req: Request, res: Response) => {
+  const { remetente, conteudo } = req.body;
+  try {
+    const novaMensagem = await prisma.mensagem.create({
+      data: { remetente, conteudo }
+    });
+    res.status(201).json(novaMensagem);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao enviar mensagem.' });
+  }
+});
+
+// Recepção buscando mensagens
+app.get('/api/mensagens', async (req: Request, res: Response) => {
+  try {
+    const mensagens = await prisma.mensagem.findMany({ orderBy: { criadoEm: 'desc' } });
+    res.json(mensagens);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar mensagens.' });
+  }
+});
+
+// Recepção marcando mensagem como lida
+app.put('/api/mensagens/:id/ler', async (req: Request, res: Response) => {
+  try {
+    const mensagem = await prisma.mensagem.update({
+      where: { id: req.params.id },
+      data: { lida: true }
+    });
+    res.json(mensagem);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao atualizar mensagem.' });
+  }
 });
 
 // ==========================================

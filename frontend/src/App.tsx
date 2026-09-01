@@ -26,7 +26,7 @@ export default function App() {
   const [senhaInput, setSenhaInput] = useState('');
 
   // --- NAVEGAÇÃO E UI ---
-  const [abaAtiva, setAbaAtiva] = useState<'dashboard' | 'hospedes' | 'quartos' | 'reservas' | 'operacoes' | 'restaurante' | 'caixa' | 'portal-hospede' | 'mapa' | 'configuracoes' | 'rh'>('dashboard');
+  const [abaAtiva, setAbaAtiva] = useState<'dashboard' | 'hospedes' | 'quartos' | 'reservas' | 'operacoes' | 'restaurante' | 'caixa' | 'portal-hospede' | 'mapa' | 'configuracoes' | 'rh' | 'mensagens'>('dashboard');
   const [menuMobileAberto, setMenuMobileAberto] = useState(false); 
   const [abaPortal, setAbaPortal] = useState<'visao-geral' | 'guia' | 'concierge' | 'preferencias'>('visao-geral');
   const [abaRestaurante, setAbaRestaurante] = useState<'pedidos' | 'layout'>('pedidos');
@@ -43,6 +43,7 @@ export default function App() {
   const [pedidosCozinha, setPedidosCozinha] = useState<any[]>([]);
   const [reservasMesas, setReservasMesas] = useState<any[]>([]);
   const [eventosAgenda, setEventosAgenda] = useState<any[]>([]);
+  const [mensagens, setMensagens] = useState<any[]>([]); // Novo estado para Mensagens
   
   // --- ESTADOS DE FORMULÁRIOS E OPERAÇÕES ---
   const [extratoHospede, setExtratoHospede] = useState<any>(null);
@@ -51,6 +52,7 @@ export default function App() {
   const [paxReservaMesa, setPaxReservaMesa] = useState('2');
   const [termoBusca, setTermoBusca] = useState('');
   const [categoriaFiltro, setCategoriaFiltro] = useState('TODOS');
+  const [novaMensagemTexto, setNovaMensagemTexto] = useState(''); // Novo estado para o Chat
 
   // Perfil e Configurações
   const [perfilNome, setPerfilNome] = useState('');
@@ -79,68 +81,36 @@ export default function App() {
   const [valorTransacao, setValorTransacao] = useState(''); const [metodoPagamento, setMetodoPagamento] = useState('PIX');
 
   // --- DADOS MOCADOS INICIAIS ---
-  const [chamados, setChamados] = useState<ChamadoManutencao[]>([
-    { id: '1', local: 'QUARTO S-04', descricao: 'Ar condicionado não gela', prioridade: 'Alta', tempoEspera: '15 min', status: 'Pendente', hospedeEnvolvido: 'Hóspede no quarto' },
-    { id: '2', local: 'QUARTO S-12', descricao: 'Troca de lâmpada (Banheiro)', prioridade: 'Média', tempoEspera: '1h 20m', status: 'Pendente' },
-    { id: '3', local: 'ÁREA COMUM - PISCINA', descricao: 'Ajuste de aquecedor', prioridade: 'Baixa', tempoEspera: 'Iniciado há 45m', status: 'Em Andamento' }
-  ]);
-
-  const [tarefasLimpeza, setTarefasLimpeza] = useState<TarefaGovernanca[]>([
-    { id: '1', quarto: 'C01 - Suíte Master Dourada', tipo: 'Limpeza de Check-in', observacao: 'Hóspede chega às 14:00', status: 'Sujo', urgente: true },
-    { id: '2', quarto: 'S02 - Quarto Superior Serra', tipo: 'Limpeza de Estadia (Arrumação)', observacao: 'Trocar toalhas', status: 'Em Limpeza', responsavel: 'Maria' },
-    { id: '3', quarto: 'B04 - Bangalô Jardim', tipo: 'Necessita Manutenção', observacao: 'Aguardando reparo no ar condicionado', status: 'Bloqueado' }
-  ]);
+  const [chamados, setChamados] = useState<ChamadoManutencao[]>([]);
+  const [tarefasLimpeza, setTarefasLimpeza] = useState<TarefaGovernanca[]>([]);
 
   // --- INTEGRAÇÕES COM API ---
   const buscarPedidosCozinha = async () => { 
     try { 
       const res = await axios.get('http://localhost:3333/api/consumos/ativos', { timeout: 3000 }); 
       setPedidosCozinha(Array.isArray(res.data) ? res.data : []); 
-    } catch (err) { 
-      console.error('Erro ao buscar pedidos da cozinha:', err); 
-      setPedidosCozinha([]); 
-    } 
+    } catch (err) { console.error('Erro ao buscar pedidos da cozinha:', err); setPedidosCozinha([]); } 
   };
 
   const atualizarStatusPedido = async (id: string, novoStatus: string) => { 
     try { 
       await axios.put(`http://localhost:3333/api/consumos/${id}/status`, { status: novoStatus }); 
       buscarPedidosCozinha(); 
-    } catch (err) { 
-      alert('Erro ao atualizar status.'); 
-    } 
+    } catch (err) { alert('Erro ao atualizar status.'); } 
   };
 
   const buscarReservasMesas = async () => {
     try {
       const res = await axios.get('http://localhost:3333/api/restaurante/reservas');
       setReservasMesas(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error('Erro ao buscar reservas de mesas', err);
-    }
+    } catch (err) { console.error('Erro ao buscar reservas de mesas', err); }
   };
 
   const buscarEventosAgenda = async () => {
     try {
       const res = await axios.get('http://localhost:3333/api/restaurante/eventos');
       setEventosAgenda(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error('Erro ao buscar eventos', err);
-    }
-  };
-
-  const reservarMesaRestaurante = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!mesaSelecionada) return alert("Por favor, selecione uma mesa clicando no mapa.");
-    try {
-      await axios.post('http://localhost:3333/api/restaurante/reservas', {
-        nome: nomeReservaMesa, data: '30/08/2026', hora: '20:30', qtdPessoas: Number(paxReservaMesa), mesa: mesaSelecionada
-      });
-      alert(`Mesa ${mesaSelecionada} reservada com sucesso para ${nomeReservaMesa}!`);
-      setNomeReservaMesa(''); setMesaSelecionada(''); buscarReservasMesas();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao salvar reserva de mesa.');
-    }
+    } catch (err) { console.error('Erro ao buscar eventos', err); }
   };
 
   const buscarExtratoHospede = async (email: string) => { 
@@ -153,9 +123,7 @@ export default function App() {
           return { ...prev, reservaId: res.data.reservaId };
         }); 
       } 
-    } catch (err) { 
-      console.error('Erro ao carregar extrato'); 
-    } 
+    } catch (err) { console.error('Erro ao carregar extrato'); } 
   };
 
   const buscarHospedes = () => axios.get('http://localhost:3333/api/hospedes').then(res => setHospedes(res.data));
@@ -163,6 +131,40 @@ export default function App() {
   const buscarReservas = () => axios.get('http://localhost:3333/api/reservas').then(res => setReservas(res.data));
   const buscarProdutos = () => axios.get('http://localhost:3333/api/produtos').then(res => setProdutos(res.data));
   const buscarTransacoes = () => axios.get('http://localhost:3333/api/transacoes').then(res => setTransacoes(res.data));
+
+  const buscarOperacoes = async () => {
+    try {
+      const resLimpeza = await axios.get('http://localhost:3333/api/operacoes/limpeza'); setTarefasLimpeza(resLimpeza.data);
+      const resReparos = await axios.get('http://localhost:3333/api/operacoes/reparos'); setChamados(resReparos.data);
+    } catch (error) { console.error('Erro ao buscar operações:', error); }
+  };
+
+  // Funções de Mensagens (NOVAS)
+  const buscarMensagens = async () => {
+    try {
+      const res = await axios.get('http://localhost:3333/api/mensagens');
+      setMensagens(res.data);
+    } catch (err) { console.error('Erro ao buscar mensagens', err); }
+  };
+
+  const enviarMensagem = async () => {
+    if (!novaMensagemTexto.trim()) return;
+    try {
+      await axios.post('http://localhost:3333/api/mensagens', {
+        remetente: usuarioLogado?.nome || 'Hóspede',
+        conteudo: novaMensagemTexto
+      });
+      alert('Mensagem enviada com sucesso! A recepção responderá em breve.');
+      setNovaMensagemTexto('');
+    } catch (error) { alert('Erro ao enviar mensagem.'); }
+  };
+
+  const marcarMensagemLida = async (id: string) => {
+    try {
+      await axios.put(`http://localhost:3333/api/mensagens/${id}/ler`);
+      buscarMensagens();
+    } catch (error) { alert('Erro ao marcar como lida.'); }
+  };
 
   // --- EFEITOS (USE EFFECT) ---
   useEffect(() => {
@@ -183,13 +185,17 @@ export default function App() {
       if (abaAtiva === 'caixa') buscarTransacoes();
       if (abaAtiva === 'dashboard') { buscarHospedes(); buscarQuartos(); buscarReservas(); }
       if (abaAtiva === 'operacoes') buscarOperacoes();
+      if (abaAtiva === 'mensagens') buscarMensagens();
     }
   }, [abaAtiva, autenticado]);
 
   useEffect(() => {
     let intervalo: ReturnType<typeof setInterval>;
-    if (autenticado && (abaAtiva === 'restaurante' || abaAtiva === 'portal-hospede')) {
-      intervalo = setInterval(() => { buscarPedidosCozinha(); }, 10000);
+    if (autenticado && (abaAtiva === 'restaurante' || abaAtiva === 'portal-hospede' || abaAtiva === 'mensagens')) {
+      intervalo = setInterval(() => { 
+        if (abaAtiva === 'restaurante' || abaAtiva === 'portal-hospede') buscarPedidosCozinha(); 
+        if (abaAtiva === 'mensagens') buscarMensagens();
+      }, 10000);
     }
     return () => { if (intervalo) clearInterval(intervalo); };
   }, [abaAtiva, autenticado]);
@@ -271,11 +277,14 @@ export default function App() {
     } catch (error: any) { alert(error.response?.data?.error || 'Erro ao alterar a senha. Verifique se a senha atual está correta.'); }
   };
 
-  const buscarOperacoes = async () => {
+  const reservarMesaRestaurante = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mesaSelecionada) return alert("Por favor, selecione uma mesa clicando no mapa.");
     try {
-      const resLimpeza = await axios.get('http://localhost:3333/api/operacoes/limpeza'); setTarefasLimpeza(resLimpeza.data);
-      const resReparos = await axios.get('http://localhost:3333/api/operacoes/reparos'); setChamados(resReparos.data);
-    } catch (error) { console.error('Erro ao buscar operações:', error); }
+      await axios.post('http://localhost:3333/api/restaurante/reservas', { nome: nomeReservaMesa, data: '30/08/2026', hora: '20:30', qtdPessoas: Number(paxReservaMesa), mesa: mesaSelecionada });
+      alert(`Mesa ${mesaSelecionada} reservada com sucesso para ${nomeReservaMesa}!`);
+      setNomeReservaMesa(''); setMesaSelecionada(''); buscarReservasMesas();
+    } catch (err: any) { alert(err.response?.data?.error || 'Erro ao salvar reserva de mesa.'); }
   };
 
   const atualizarStatusLimpeza = async (id: string, novoStatus: string) => {
@@ -290,6 +299,19 @@ export default function App() {
       await axios.put(`http://localhost:3333/api/operacoes/reparos/${id}/status`, { status: novoStatus });
       buscarOperacoes();
     } catch (error) { alert('Erro ao atualizar chamado de manutenção.'); }
+  };
+
+  const solicitarAtendimentoHospede = async (tipo: 'limpeza' | 'reparos', titulo: string, observacao: string) => {
+    const local = usuarioLogado?.reservaId ? `Hóspede: ${usuarioLogado.nome}` : `Quarto (${usuarioLogado?.nome})`;
+    try {
+      if (tipo === 'limpeza') {
+        await axios.post('http://localhost:3333/api/operacoes/limpeza', { quarto: local, tipo: titulo, observacao: observacao, status: 'Sujo', urgente: false });
+      } else {
+        await axios.post('http://localhost:3333/api/operacoes/reparos', { local: local, descricao: `${titulo} - ${observacao}`, prioridade: 'Média', status: 'Pendente', hospedeEnvolvido: usuarioLogado?.nome });
+      }
+      alert(`Sua solicitação para "${titulo}" foi enviada com sucesso! A equipe já foi notificada.`);
+      buscarOperacoes();
+    } catch (error) { console.error('Erro ao solicitar atendimento:', error); alert('Houve um erro ao enviar sua solicitação. Tente novamente.'); }
   };
 
   // --- VARIÁVEIS DERIVADAS DE ESTADO ---
@@ -379,6 +401,7 @@ export default function App() {
               <SidebarItem id="quartos" label="Quartos" icon={BedDouble} />
               <SidebarItem id="reservas" label="Reservas" icon={CalendarCheck} />
               <SidebarItem id="operacoes" label="Limpeza & Manutenção" icon={Brush} />
+              <SidebarItem id="mensagens" label="Mensagens" icon={MessageSquare} />
               <SidebarItem id="mapa" label="Mapa" icon={Map} />
             </>
           )}
@@ -1418,15 +1441,19 @@ export default function App() {
                       <div className="flex flex-col gap-4">
                         <div className="flex items-center justify-between p-4 border border-outline-variant/50 rounded-lg hover:border-primary/30 transition-colors bg-[#faf9f6]">
                             <div><h4 className="font-bold text-sm text-on-surface">Toalhas Extras</h4><p className="text-xs text-secondary mt-0.5">Jogo de banho completo</p></div>
-                            <button onClick={() => alert('Solicitação enviada para a Governança!')} className="px-5 py-2.5 bg-primary-container text-primary-fixed-variant text-xs font-bold rounded-lg hover:brightness-95 cursor-pointer">Solicitar</button>
+                            <button onClick={() => solicitarAtendimentoHospede('limpeza', 'Toalhas Extras', 'Solicitação de jogo de banho')} className="px-5 py-2.5 bg-primary-container text-primary-fixed-variant text-xs font-bold rounded-lg hover:brightness-95 cursor-pointer shadow-sm">Solicitar</button>
                         </div>
                         <div className="flex items-center justify-between p-4 border border-outline-variant/50 rounded-lg hover:border-primary/30 transition-colors bg-[#faf9f6]">
                             <div><h4 className="font-bold text-sm text-on-surface">Reposição Frigobar</h4><p className="text-xs text-secondary mt-0.5">Água, sucos e snacks</p></div>
-                            <button onClick={() => alert('Solicitação enviada para o Restaurante!')} className="px-5 py-2.5 bg-primary-container text-primary-fixed-variant text-xs font-bold rounded-lg hover:brightness-95 cursor-pointer">Solicitar</button>
+                            <button onClick={() => solicitarAtendimentoHospede('limpeza', 'Reposição Frigobar', 'Água, sucos e snacks')} className="px-5 py-2.5 bg-primary-container text-primary-fixed-variant text-xs font-bold rounded-lg hover:brightness-95 cursor-pointer shadow-sm">Solicitar</button>
                         </div>
                         <div className="flex items-center justify-between p-4 border border-outline-variant/50 rounded-lg hover:border-primary/30 transition-colors bg-[#faf9f6]">
                             <div><h4 className="font-bold text-sm text-on-surface">Limpeza do Quarto</h4><p className="text-xs text-secondary mt-0.5">Arrumação e higienização</p></div>
-                            <button onClick={() => alert('Arrumação agendada com a equipe!')} className="px-5 py-2.5 bg-primary-container text-primary-fixed-variant text-xs font-bold rounded-lg hover:brightness-95 cursor-pointer">Solicitar</button>
+                            <button onClick={() => solicitarAtendimentoHospede('limpeza', 'Arrumação de Quarto', 'Limpeza geral solicitada pelo hóspede')} className="px-5 py-2.5 bg-primary-container text-primary-fixed-variant text-xs font-bold rounded-lg hover:brightness-95 cursor-pointer shadow-sm">Solicitar</button>
+                        </div>
+                        <div className="flex items-center justify-between p-4 border border-outline-variant/50 rounded-lg hover:border-error/30 transition-colors bg-[#faf9f6] border-l-4 border-l-error">
+                            <div><h4 className="font-bold text-sm text-on-surface">Problema / Manutenção</h4><p className="text-xs text-secondary mt-0.5">Luz, ar condicionado, TV, etc.</p></div>
+                            <button onClick={() => solicitarAtendimentoHospede('reparos', 'Manutenção Necessária', 'Hóspede relatou problema no quarto')} className="px-5 py-2.5 bg-error text-white text-xs font-bold rounded-lg hover:brightness-95 cursor-pointer shadow-sm">Solicitar</button>
                         </div>
                       </div>
                   </div>
@@ -1436,8 +1463,8 @@ export default function App() {
                       <p className="text-sm text-secondary mb-6">Precisa de algo específico ou tem alguma dúvida? Envie uma mensagem direta para nossa equipe.</p>
                       
                       <div className="flex-1 flex flex-col gap-3">
-                        <textarea rows={4} placeholder="Ex: Gostaria de agendar o SPA para amanhã às 14h..." className="w-full p-4 rounded-xl border border-outline-variant bg-[#faf9f6] outline-none focus:border-primary resize-none text-sm text-on-surface font-body-md"></textarea>
-                        <button onClick={() => alert('Mensagem enviada com sucesso! A recepção responderá em breve.')} className="w-full py-3.5 bg-primary text-white font-label-md font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm hover:brightness-95 cursor-pointer mt-auto">
+                        <textarea rows={4} value={novaMensagemTexto} onChange={(e) => setNovaMensagemTexto(e.target.value)} placeholder="Ex: Gostaria de agendar o SPA para amanhã às 14h..." className="w-full p-4 rounded-xl border border-outline-variant bg-[#faf9f6] outline-none focus:border-primary resize-none text-sm text-on-surface font-body-md"></textarea>
+                        <button onClick={enviarMensagem} className="w-full py-3.5 bg-primary text-white font-label-md font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm hover:brightness-95 cursor-pointer mt-auto">
                           Enviar Mensagem
                         </button>
                       </div>
@@ -1501,6 +1528,48 @@ export default function App() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* === MÓDULO: MENSAGENS (RECEPÇÃO) === */}
+          {abaAtiva === 'mensagens' && (
+            <div className="flex flex-col gap-6 animate-fade-in">
+              <div className="flex justify-between items-end border-b border-outline-variant/30 pb-4">
+                 <div>
+                    <h1 className="font-headline-lg text-3xl text-on-surface mb-1">Caixa de Mensagens</h1>
+                    <p className="text-secondary font-body-md">Central de atendimento e solicitações dos hóspedes.</p>
+                 </div>
+                 <button onClick={buscarMensagens} className="flex items-center gap-2 px-4 py-2 bg-surface-container rounded-lg text-primary font-bold text-sm hover:bg-surface-container-high transition-colors cursor-pointer shadow-sm">
+                   <RefreshCw size={16} /> Atualizar
+                 </button>
+              </div>
+
+              <div className="flex flex-col gap-4 max-w-4xl">
+                 {mensagens.map((msg: any) => (
+                    <div key={msg.id} className={`p-5 rounded-xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-colors ${msg.lida ? 'bg-surface opacity-70 border-surface-container' : 'bg-white border-primary/40 shadow-sm'}`}>
+                       <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                             <h4 className="font-bold text-sm text-on-surface flex items-center gap-2">
+                               <Users size={14} className="text-secondary"/> {msg.remetente}
+                             </h4>
+                             {!msg.lida && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-primary-container text-primary-fixed-variant uppercase tracking-wider">Nova</span>}
+                             <span className="text-xs text-secondary ml-auto md:ml-2 flex items-center gap-1">
+                               <Clock size={12}/> {new Date(msg.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                             </span>
+                          </div>
+                          <p className={`text-sm ${msg.lida ? 'text-secondary' : 'text-on-surface font-medium'}`}>{msg.conteudo}</p>
+                       </div>
+                       {!msg.lida && (
+                          <button onClick={() => marcarMensagemLida(msg.id)} className="w-full md:w-auto px-4 py-2 bg-on-surface text-white text-xs font-bold rounded-lg hover:opacity-90 cursor-pointer whitespace-nowrap shadow-sm">
+                             Marcar como Lida
+                          </button>
+                       )}
+                    </div>
+                 ))}
+                 {mensagens.length === 0 && (
+                    <p className="text-secondary text-center py-10">Nenhuma mensagem na caixa de entrada. Tudo tranquilo! ✨</p>
+                 )}
+              </div>
             </div>
           )}
 
