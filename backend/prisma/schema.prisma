@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite" // Pode ser alterado para "postgresql" ou "mysql" na produção
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -20,9 +20,8 @@ model Hospede {
   email        String?
   telefone     String
   
-  // Cadastro Avançado
-  preferencias String?   // Ex: Cama extra, travesseiro de penas
-  observacoes  String?   // Ex: Alergia a frutos do mar, check-in tardio
+  preferencias String?
+  observacoes  String?
   
   criadoEm     DateTime  @default(now())
   reservas     Reserva[]
@@ -39,17 +38,15 @@ model Quarto {
   status        String       @default("LIVRE")
   categoria     String
   
-  // Detalhamento e Mapa Interativo
-  descricao     String?      // Descrição detalhada do ambiente
-  itensInclusos String?      // Ex: "Ar-condicionado, TV Smart, Frigobar"
-  coordX        Float?       // Eixo X para o Mapa Interativo
-  coordY        Float?       // Eixo Y para o Mapa Interativo
+  descricao     String?
+  itensInclusos String?
+  coordX        Float?
+  coordY        Float?
   
-  fotos         FotoQuarto[] // Relacionamento com a Galeria
+  fotos         FotoQuarto[]
   reservas      Reserva[]
 }
 
-// Galeria de Fotos por Acomodação
 model FotoQuarto {
   id       String @id @default(uuid())
   url      String
@@ -58,14 +55,14 @@ model FotoQuarto {
 }
 
 // ==========================================
-// 3. MAPA INTERATIVO DA POUSADA
+// 3. MAPA INTERATIVO
 // ==========================================
 model AreaLazer {
   id        String  @id @default(uuid())
-  nome      String  // Ex: "Piscina Principal", "Recepção", "Estacionamento"
+  nome      String
   descricao String?
-  coordX    Float   // Eixo X no mapa
-  coordY    Float   // Eixo Y no mapa
+  coordX    Float
+  coordY    Float
 }
 
 // ==========================================
@@ -91,15 +88,12 @@ model Reserva {
 // 5. RESTAURANTE E SERVIÇOS EXTRAS
 // ==========================================
 model Produto {
-  id        String    @id @default(uuid())
-  nome      String
-  preco     Float
-  estoque   Int
-  
-  // Diferenciação de serviços
-  categoria String    @default("RESTAURANTE") // Ex: "RESTAURANTE", "CAFE_EXTRA", "PASSEIO"
-  
-  consumos  Consumo[]
+  id       String    @id @default(uuid())
+  nome     String
+  preco    Float
+  estoque  Int
+  categoria String   @default("RESTAURANTE")
+  consumos Consumo[]
 }
 
 model Consumo {
@@ -107,7 +101,7 @@ model Consumo {
   reservaId   String
   produtoId   String
   observacoes String?
-  status      String   @default("SOLICITADO") // "SOLICITADO", "EM_PREPARO", "PRONTO", "ENTREGUE"
+  status      String   @default("SOLICITADO")
   quantidade  Int
   subtotal    Float
   criadoEm    DateTime @default(now())
@@ -135,7 +129,7 @@ model Usuario {
   id        String   @id @default(uuid())
   nome      String
   email     String   @unique
-  senha     String   // Salva o Hash gerado pelo Bcrypt
+  senha     String
   cargo     String
   reservaId String?
   criadoEm  DateTime @default(now())
@@ -163,19 +157,19 @@ model EventoRestaurante {
   data      String
   hora      String
   descricao String
-  tipo      String   @default("Especial") // Ex: "Especial", "Privado", "Música ao Vivo"
+  tipo      String   @default("Especial")
   criadoEm  DateTime @default(now())
 }
 
 // ==========================================
-// 9. GESTÃO OPERACIONAL (GOVERNANÇA E MANUTENÇÃO)
+// 9. GESTÃO OPERACIONAL
 // ==========================================
 model TarefaLimpeza {
   id          String   @id @default(uuid())
   quarto      String
   tipo        String
   observacao  String?
-  status      String   @default("Sujo") // "Sujo", "Em Limpeza", "Limpo", "Bloqueado"
+  status      String   @default("Sujo")
   urgente     Boolean  @default(false)
   responsavel String?
   criadoEm    DateTime @default(now())
@@ -185,9 +179,9 @@ model ChamadoManutencao {
   id               String   @id @default(uuid())
   local            String
   descricao        String
-  prioridade       String   @default("Baixa") // "Alta", "Média", "Baixa"
+  prioridade       String   @default("Baixa")
   tempoEspera      String?
-  status           String   @default("Pendente") // "Pendente", "Em Andamento", "Concluído"
+  status           String   @default("Pendente")
   hospedeEnvolvido String?
   criadoEm         DateTime @default(now())
 }
@@ -197,8 +191,9 @@ model ChamadoManutencao {
 // ==========================================
 model Mensagem {
   id        String   @id @default(uuid())
-  remetente String   // Nome de quem enviou (Hóspede)
+  remetente String
   conteudo  String
+  resposta  String?  // Suporte à resposta da recepção
   lida      Boolean  @default(false)
   criadoEm  DateTime @default(now())
 }
