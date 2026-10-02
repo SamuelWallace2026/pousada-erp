@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Key } from 'lucide-react';
 import axios from 'axios';
+import toast from 'react-hot-toast'; // <-- Importamos o toast aqui!
 
 interface LoginProps {
   onLoginSucesso: (usuario: any) => void;
@@ -17,10 +18,14 @@ export default function Login({ onLoginSucesso }: LoginProps) {
         email: emailInput, 
         senha: senhaInput 
       });
-      // Se deu certo, avisa o App.tsx passando os dados do usuário
+      
+      // Toast de Sucesso elegante!
+      toast.success('Login realizado com sucesso! Bem-vindo(a).');
+      
       onLoginSucesso(response.data);
     } catch (error) { 
-      alert('E-mail ou senha incorretos! Verifique suas credenciais.'); 
+      // Toast de Erro moderno, substituindo o alert() antigo!
+      toast.error('E-mail ou senha incorretos! Verifique suas credenciais.'); 
       setSenhaInput(''); 
     }
   };

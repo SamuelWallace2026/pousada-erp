@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { RefreshCw, Activity, AlertCircle, Check, Utensils, Clock, ChevronRight } from 'lucide-react';
 import { api } from '../services/api';
+import toast from 'react-hot-toast'; // <-- Importando o toast!
 
 interface RestauranteProps {
   produtos: any[];
@@ -32,21 +33,28 @@ export default function Restaurante({
     e.preventDefault(); 
     try { 
       await api.post('/produtos', { nome: prodNome, preco: Number(prodPreco), estoque: Number(prodEstoque), categoria: prodCategoria }); 
-      alert('Item salvo!'); 
+      toast.success('Item salvo no cardápio!'); // <-- Toast de sucesso
       setProdNome(''); setProdPreco(''); setProdEstoque(''); setProdCategoria('Prato Principal'); 
       buscarProdutos(); 
-    } catch (error) { alert('Erro ao cadastrar produto.'); } 
+    } catch (error) { 
+      toast.error('Erro ao cadastrar produto.'); // <-- Toast de erro
+    } 
   };
 
   const reservarMesaRestaurante = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!mesaSelecionada) return alert("Por favor, selecione uma mesa clicando no mapa.");
+    if (!mesaSelecionada) {
+      toast.error("Por favor, selecione uma mesa clicando no mapa."); // <-- Toast de erro
+      return;
+    }
     try {
       await api.post('/restaurante/reservas', { nome: nomeReservaMesa, data: '30/08/2026', hora: '20:30', qtdPessoas: Number(paxReservaMesa), mesa: mesaSelecionada });
-      alert(`Mesa ${mesaSelecionada} reservada com sucesso para ${nomeReservaMesa}!`);
+      toast.success(`Mesa ${mesaSelecionada} reservada com sucesso para ${nomeReservaMesa}!`); // <-- Toast de sucesso
       setNomeReservaMesa(''); setMesaSelecionada(''); 
       buscarReservasMesas();
-    } catch (err: any) { alert(err.response?.data?.error || 'Erro ao salvar reserva de mesa.'); }
+    } catch (err: any) { 
+      toast.error(err.response?.data?.error || 'Erro ao salvar reserva de mesa.'); // <-- Toast lendo o backend
+    }
   };
 
   return (
@@ -60,7 +68,7 @@ export default function Restaurante({
             </div>
          </div>
          {abaRestaurante === 'pedidos' && (
-            <button onClick={() => buscarPedidosCozinha()} className="flex items-center gap-2 px-4 py-2 bg-surface-container rounded-lg text-primary font-bold text-sm hover:bg-surface-container-high transition-colors cursor-pointer shadow-sm"><RefreshCw size={16} /> Atualizar</button>
+            <button onClick={() => { buscarPedidosCozinha(); toast.success('Pedidos atualizados!', { id: 'refresh-cozinha' }); }} className="flex items-center gap-2 px-4 py-2 bg-surface-container rounded-lg text-primary font-bold text-sm hover:bg-surface-container-high transition-colors cursor-pointer shadow-sm"><RefreshCw size={16} /> Atualizar</button>
          )}
       </div>
 
@@ -227,7 +235,9 @@ export default function Restaurante({
                              key={num}
                              onClick={() => {
                                if (reservaDaMesa) {
-                                 if (window.confirm(`A Mesa ${num} está ocupada. Deseja cancelar esta reserva e liberar a mesa?`)) { alert('Função de cancelar reserva em desenvolvimento.'); }
+                                 if (window.confirm(`A Mesa ${num} está ocupada. Deseja cancelar esta reserva e liberar a mesa?`)) { 
+                                   toast.error('Função de cancelar reserva em desenvolvimento.', { icon: '🚧' }); 
+                                 }
                                } else { setMesaSelecionada(num); }
                              }}
                              title={reservaDaMesa ? `Reservado para: ${reservaDaMesa.nome} | Pessoas: ${reservaDaMesa.qtdPessoas}` : `Mesa ${num} - Clique para selecionar`}

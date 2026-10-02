@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Users } from 'lucide-react';
 import { api } from '../services/api';
+import toast from 'react-hot-toast'; // <-- Importamos o toast!
 
 interface QuartosProps {
   quartos: any[];
@@ -23,11 +24,11 @@ export default function Quartos({ quartos, buscarQuartos, formatarMoeda }: Quart
         valorDiaria: Number(valorDiaria), 
         categoria 
       });
-      alert('Quarto salvo com sucesso!');
+      toast.success('Acomodação salva com sucesso!'); // <-- Toast de sucesso!
       setNumero(''); setCapacidade(''); setValorDiaria(''); setCategoria('Chalé Luxo Casal');
       buscarQuartos();
     } catch (error) {
-      alert('Erro ao salvar quarto.');
+      toast.error('Erro ao salvar acomodação.'); // <-- Toast de erro!
     }
   };
 

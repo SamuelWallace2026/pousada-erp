@@ -19,6 +19,7 @@ import Restaurante from './pages/Restaurante';
 import PortalHospede from './pages/PortalHospede';
 import Mensagens from './pages/Mensagens';
 import RH from './pages/RH';
+import toast, { Toaster } from 'react-hot-toast'; // <-- Toast importado corretamente!
 
 interface Hospede { id: string; nome: string; cpf: string; email: string; telefone: string; }
 interface Quarto { id: string; numero: string; capacidade: number; valorDiaria: number; status: string; categoria: string; descricao?: string; itensInclusos?: string; }
@@ -60,7 +61,7 @@ export default function App() {
     try { 
       await axios.put(`http://localhost:3333/api/consumos/${id}/status`, { status: novoStatus }); 
       buscarPedidosCozinha(); 
-    } catch (err) { alert('Erro ao atualizar status.'); } 
+    } catch (err) { toast.error('Erro ao atualizar status.'); } // <-- Atualizado
   };
 
   const buscarReservasMesas = async () => {
@@ -101,8 +102,9 @@ export default function App() {
   const marcarMensagemLida = async (id: string, resposta: string) => {
     try {
       await axios.put(`http://localhost:3333/api/mensagens/${id}/ler`, { resposta });
+      toast.success('Mensagem arquivada!'); // <-- Atualizado
       buscarMensagens();
-    } catch (error) { alert('Erro ao atualizar mensagem.'); }
+    } catch (error) { toast.error('Erro ao atualizar mensagem.'); } // <-- Atualizado
   };
 
   useEffect(() => {
@@ -134,16 +136,38 @@ export default function App() {
   const formatarMoeda = (valor: number) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   
   const pedirComoHospede = async (produtoId: string, observacoes: string) => { 
-    if (!extratoHospede || !extratoHospede.temReserva) { alert('Sua conta não está vinculada a nenhuma reserva ativa.'); return; } 
+    if (!extratoHospede || !extratoHospede.temReserva) { 
+      toast.error('Sua conta não está vinculada a nenhuma reserva ativa.'); // <-- Atualizado
+      return; 
+    } 
     try { 
       await axios.post('http://localhost:3333/api/consumos', { reservaId: extratoHospede.reservaId, produtoId, quantidade: 1, observacoes }); 
-      alert('Pedido realizado!'); buscarPedidosCozinha(); buscarExtratoHospede(usuarioLogado.email); 
-    } catch (error) { alert('Erro ao registrar pedido.'); } 
+      toast.success('Pedido realizado com sucesso!'); // <-- Atualizado
+      buscarPedidosCozinha(); 
+      buscarExtratoHospede(usuarioLogado.email); 
+    } catch (error) { toast.error('Erro ao registrar pedido.'); } // <-- Atualizado
   };
   
-  const cancelarPedido = async (id: string) => { if (!window.confirm('Cancelar este pedido?')) return; try { await axios.put(`http://localhost:3333/api/consumos/${id}/cancelar`); alert('Cancelado.'); buscarPedidosCozinha(); buscarExtratoHospede(usuarioLogado.email); } catch (error: any) { alert('Erro.'); } };
+  const cancelarPedido = async (id: string) => { 
+    if (!window.confirm('Cancelar este pedido?')) return; 
+    try { 
+      await axios.put(`http://localhost:3333/api/consumos/${id}/cancelar`); 
+      toast.success('Pedido cancelado.'); // <-- Atualizado
+      buscarPedidosCozinha(); 
+      buscarExtratoHospede(usuarioLogado.email); 
+    } catch (error: any) { toast.error('Erro ao cancelar pedido.'); } // <-- Atualizado
+  };
   
-  const fazerCheckout = async (reservaId: string) => { if (!window.confirm('Deseja finalizar esta reserva?')) return; try { await axios.put(`http://localhost:3333/api/reservas/${reservaId}/checkout`); alert('Check-out realizado!'); buscarReservas(); buscarQuartos(); } catch (error) {} };
+  const fazerCheckout = async (reservaId: string) => { 
+    if (!window.confirm('Confirmar checkout deste hóspede? O quarto ficará livre e precisará de limpeza.')) return; 
+    try { 
+      await axios.put(`http://localhost:3333/api/reservas/${reservaId}/checkout`); 
+      toast.success('Check-out realizado! Quarto enviado para limpeza.', { duration: 4000 }); // <-- Atualizado
+      buscarReservas(); 
+      buscarQuartos(); 
+      buscarOperacoes(); // Atualiza painel de governança
+    } catch (error) { toast.error('Erro ao realizar o check-out.'); } // <-- Atualizado
+  };
 
   const emitirRecibo = (reserva: any) => {
     const dataIn = new Date(reserva.dataCheckIn); const dataOut = new Date(reserva.dataCheckOut); const diffTempo = Math.abs(dataOut.getTime() - dataIn.getTime()); const qtdDiarias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) || 1; const totalDiarias = qtdDiarias * reserva.quarto.valorDiaria;
@@ -154,19 +178,26 @@ export default function App() {
   const enviarWhatsApp = (reserva: Reserva) => { window.open(`https://wa.me/55${reserva.hospede.telefone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${reserva.hospede.nome}! Agradecemos por escolher a Pousada Refúgio Dourado.`)}`, '_blank'); };
   
   const atualizarStatusLimpeza = async (id: string, novoStatus: string) => {
-    try { await axios.put(`http://localhost:3333/api/operacoes/limpeza/${id}/status`, { status: novoStatus, responsavel: novoStatus === 'Em Limpeza' ? usuarioLogado?.nome : null }); buscarOperacoes(); } catch (error) {}
+    try { 
+      await axios.put(`http://localhost:3333/api/operacoes/limpeza/${id}/status`, { status: novoStatus, responsavel: novoStatus === 'Em Limpeza' ? usuarioLogado?.nome : null }); 
+      buscarOperacoes(); 
+    } catch (error) { toast.error('Erro ao atualizar status da limpeza.'); } // <-- Adicionado
   };
 
   const atualizarStatusReparo = async (id: string, novoStatus: string) => {
-    try { await axios.put(`http://localhost:3333/api/operacoes/reparos/${id}/status`, { status: novoStatus }); buscarOperacoes(); } catch (error) {}
+    try { 
+      await axios.put(`http://localhost:3333/api/operacoes/reparos/${id}/status`, { status: novoStatus }); 
+      buscarOperacoes(); 
+    } catch (error) { toast.error('Erro ao atualizar status do reparo.'); } // <-- Adicionado
   };
 
   const solicitarAtendimentoHospede = async (tipo: 'limpeza' | 'reparos', titulo: string, observacao: string) => {
     try {
       if (tipo === 'limpeza') { await axios.post('http://localhost:3333/api/operacoes/limpeza', { quarto: `Hóspede: ${usuarioLogado?.nome}`, tipo: titulo, observacao, status: 'Sujo', urgente: false }); } 
       else { await axios.post('http://localhost:3333/api/operacoes/reparos', { local: `Hóspede: ${usuarioLogado?.nome}`, descricao: `${titulo} - ${observacao}`, prioridade: 'Média', status: 'Pendente', hospedeEnvolvido: usuarioLogado?.nome }); }
-      alert(`Solicitação para "${titulo}" enviada!`); buscarOperacoes();
-    } catch (error) { alert('Erro ao enviar.'); }
+      toast.success(`Solicitação para "${titulo}" enviada!`); // <-- Atualizado
+      buscarOperacoes();
+    } catch (error) { toast.error('Erro ao enviar solicitação.'); } // <-- Atualizado
   };
 
   const totalQuartos = quartos.length;
@@ -179,13 +210,18 @@ export default function App() {
 
   if (!autenticado) {
     return (
-      <Login onLoginSucesso={(user) => {
-        setUsuarioLogado(user); setAutenticado(true);
-        if (user.cargo === 'GERENTE') setAbaAtiva('dashboard');
-        else if (user.cargo === 'RECEPCAO') setAbaAtiva('reservas');
-        else if (user.cargo === 'COZINHA') setAbaAtiva('restaurante');
-        else if (user.cargo === 'HOSPEDE') { setAbaAtiva('portal-hospede'); buscarExtratoHospede(user.email); }
-      }} />
+      <>
+        {/* LIGANDO O TOASTER NA TELA DE LOGIN TAMBÉM! */}
+        <Toaster position="top-right" reverseOrder={false} />
+        
+        <Login onLoginSucesso={(user) => {
+          setUsuarioLogado(user); setAutenticado(true);
+          if (user.cargo === 'GERENTE') setAbaAtiva('dashboard');
+          else if (user.cargo === 'RECEPCAO') setAbaAtiva('reservas');
+          else if (user.cargo === 'COZINHA') setAbaAtiva('restaurante');
+          else if (user.cargo === 'HOSPEDE') { setAbaAtiva('portal-hospede'); buscarExtratoHospede(user.email); }
+        }} />
+      </>
     );
   }
 
@@ -200,6 +236,10 @@ export default function App() {
 
   return (
     <div className="bg-background text-on-background min-h-screen flex antialiased w-full relative">
+      
+      {/* TOASTER INSERIDO AQUI PARA APARECER EM TODA A APLICAÇÃO */}
+      <Toaster position="top-right" reverseOrder={false} />
+
       {menuMobileAberto && <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setMenuMobileAberto(false)}></div>}
 
       <aside className={`w-[280px] bg-surface-container-low border-r border-outline-variant/30 flex flex-col h-screen fixed left-0 top-0 z-40 select-none transition-transform duration-300 ${menuMobileAberto ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
@@ -260,7 +300,7 @@ export default function App() {
         </header>
 
         <main className="flex-1 p-4 md:p-10 w-full max-w-[1200px] mx-auto">
-          {abaAtiva === 'mapa' && <MapaInterativo quartos={quartos} onSelecionarQuarto={(q) => alert(`Chalé: ${q.categoria} (Nº ${q.numero})`)} />}
+          {abaAtiva === 'mapa' && <MapaInterativo quartos={quartos} onSelecionarQuarto={(q) => toast(`Chalé: ${q.categoria} (Nº ${q.numero})`, { icon: '🗺️' })} />}
           {abaAtiva === 'dashboard' && <Dashboard taxaOcupacao={taxaOcupacao} quartosOcupados={quartosOcupados} totalQuartos={totalQuartos} reservasAtivas={reservasAtivas} hospedes={hospedes} reservas={reservas} setAbaAtiva={setAbaAtiva} fazerCheckout={fazerCheckout} />}
           {abaAtiva === 'hospedes' && <Hospedes hospedes={hospedes} buscarHospedes={buscarHospedes} />}
           {abaAtiva === 'quartos' && <Quartos quartos={quartos} buscarQuartos={buscarQuartos} formatarMoeda={formatarMoeda} />}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '../services/api';
+import toast from 'react-hot-toast'; // <-- Importando o toast!
 
 interface ReservasProps {
   reservas: any[];
@@ -30,12 +31,16 @@ export default function Reservas({
       await api.post('/reservas', { 
         hospedeId, quartoId, dataCheckIn, dataCheckOut, origem 
       });
-      alert('Reserva confirmada com sucesso!');
+      
+      toast.success('Reserva confirmada com sucesso!'); // <-- Toast de Sucesso!
+      
       setHospedeId(''); setQuartoId(''); setDataCheckIn(''); setDataCheckOut(''); setOrigem('WhatsApp');
       buscarReservas();
       buscarQuartos(); // Atualiza o status do quarto para OCUPADO
-    } catch (error) {
-      alert('Erro ao criar reserva.');
+    } catch (error: any) {
+      // Captura o erro exato do backend ou usa o padrão
+      const mensagemErro = error.response?.data?.error || 'Erro ao criar reserva.';
+      toast.error(mensagemErro); // <-- Toast de Erro!
     }
   };
 

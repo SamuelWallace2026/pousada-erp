@@ -1,4 +1,6 @@
+import React from 'react';
 import { RefreshCw, Users, Clock } from 'lucide-react';
+import toast from 'react-hot-toast'; // <-- Importamos o toast
 
 interface MensagensProps {
   mensagens: any[];
@@ -7,6 +9,13 @@ interface MensagensProps {
 }
 
 export default function Mensagens({ mensagens, buscarMensagens, marcarMensagemLida }: MensagensProps) {
+  
+  // Criamos uma função local só para dar o feedback visual de atualização
+  const handleAtualizar = () => {
+    buscarMensagens();
+    toast.success('Mensagens atualizadas!', { id: 'refresh-msg' }); // id evita que a tela fique cheia de balões se clicar rápido
+  };
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
       <div className="flex justify-between items-end border-b border-outline-variant/30 pb-4">
@@ -14,7 +23,7 @@ export default function Mensagens({ mensagens, buscarMensagens, marcarMensagemLi
             <h1 className="font-headline-lg text-3xl text-on-surface mb-1">Caixa de Mensagens</h1>
             <p className="text-secondary font-body-md">Central de atendimento e solicitações dos hóspedes.</p>
          </div>
-         <button onClick={buscarMensagens} className="flex items-center gap-2 px-4 py-2 bg-surface-container rounded-lg text-primary font-bold text-sm hover:bg-surface-container-high transition-colors cursor-pointer shadow-sm">
+         <button onClick={handleAtualizar} className="flex items-center gap-2 px-4 py-2 bg-surface-container rounded-lg text-primary font-bold text-sm hover:bg-surface-container-high transition-colors cursor-pointer shadow-sm">
            <RefreshCw size={16} /> Atualizar
          </button>
       </div>

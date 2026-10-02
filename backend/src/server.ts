@@ -73,16 +73,47 @@ app.get('/api/hospedes', async (req: Request, res: Response) => {
 app.post('/api/hospedes', async (req: Request, res: Response) => {
   try {
     const { nome, cpf, email, telefone } = req.body;
-    const novoHospede = await prisma.hospede.create({ data: { nome, cpf, email, telefone } });
-    if (email) {
-      const usuarioExistente = await prisma.usuario.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
-      if (!usuarioExistente) {
-        await prisma.usuario.create({ data: { nome, email, senha: "123", cargo: "HOSPEDE" } });
-      }
+
+    // 1. VALIDAÇÃO ANTECIPADA: Verifica se o CPF já existe ANTES de fazer qualquer coisa
+    const hospedeExistente = await prisma.hospede.findUnique({ where: { cpf } });
+    if (hospedeExistente) {
+      return res.status(400).json({ error: 'Atenção: Este CPF já está cadastrado no sistema!' });
     }
-    res.json(novoHospede);
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao salvar hóspede.' });
+
+    // 2. TRANSAÇÃO (ATOMICIDADE): Garante que ou salva Hóspede + Usuário, ou não salva nenhum dos dois
+    const novoHospede = await prisma.$transaction(async (tx) => {
+      
+      // Salva o Hóspede
+      const criado = await tx.hospede.create({ data: { nome, cpf, email, telefone } });
+      
+      // Salva o Usuário para o portal
+      if (email) {
+        // CORREÇÃO: Buscando o email de forma direta, sem o 'mode: insensitive' que o SQLite rejeita
+        const usuarioExistente = await tx.usuario.findFirst({ 
+          where: { email } 
+        });
+        
+        if (!usuarioExistente) {
+          await tx.usuario.create({ 
+            data: { nome, email, senha: "123", cargo: "HOSPEDE" } 
+          });
+        }
+      }
+      
+      return criado;
+    });
+
+    res.status(201).json(novoHospede);
+  } catch (error: any) {
+    console.error("Erro no backend ao salvar hóspede:", error);
+    
+    // Pega erros de restrição do Prisma
+    if (error.code === 'P2002') {
+      const campoDuplicado = error.meta?.target?.[0] || 'dado';
+      return res.status(400).json({ error: `Atenção: Este ${campoDuplicado.toUpperCase()} já está cadastrado!` });
+    }
+    
+    res.status(500).json({ error: 'Erro interno ao salvar hóspede. Tente novamente.' });
   }
 });
 

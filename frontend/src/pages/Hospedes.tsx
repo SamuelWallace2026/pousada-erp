@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '../services/api';
+import toast from 'react-hot-toast'; 
 
 interface HospedesProps {
   hospedes: any[];
@@ -7,7 +8,6 @@ interface HospedesProps {
 }
 
 export default function Hospedes({ hospedes, buscarHospedes }: HospedesProps) {
-  // Variáveis do formulário agora vivem APENAS aqui dentro!
   const [nome, setNome] = useState('');
   const [cpf, setCpf] = useState('');
   const [email, setEmail] = useState('');
@@ -19,13 +19,14 @@ export default function Hospedes({ hospedes, buscarHospedes }: HospedesProps) {
   const cadastrarHospede = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Usando a nossa nova api centralizada!
       await api.post('/hospedes', { nome, cpf, email, telefone });
-      alert('Hóspede salvo com sucesso!');
+      toast.success('Hóspede cadastrado com sucesso!'); 
       setNome(''); setCpf(''); setEmail(''); setTelefone('');
       buscarHospedes();
-    } catch (error) {
-      alert('Erro ao salvar hóspede.');
+    } catch (error: any) {
+      // Aqui está a mágica: tenta pegar a mensagem enviada pelo backend, se não tiver, usa a padrão.
+      const mensagemErro = error.response?.data?.error || 'Erro ao salvar hóspede. Verifique os dados.';
+      toast.error(mensagemErro); 
     }
   };
 

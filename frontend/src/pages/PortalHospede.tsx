@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Utensils, Search, ShoppingBag, ChevronRight, Flame, Thermometer, Wind, MessageSquare, QrCode } from 'lucide-react';
+import toast from 'react-hot-toast'; // <-- Importamos o toast!
 import { api } from '../services/api';
 
 interface PortalHospedeProps {
@@ -32,9 +33,22 @@ export default function PortalHospede({
         remetente: usuarioLogado?.nome || 'Hóspede',
         conteudo: novaMensagemTexto
       });
-      alert('Mensagem enviada com sucesso! A recepção responderá em breve.');
+      toast.success('Mensagem enviada! A recepção responderá em breve.'); // <-- Toast de sucesso
       setNovaMensagemTexto('');
-    } catch (error) { alert('Erro ao enviar mensagem.'); }
+    } catch (error) { 
+      toast.error('Erro ao enviar mensagem.'); // <-- Toast de erro
+    }
+  };
+
+  const copiarSenhaWifi = () => {
+    navigator.clipboard.writeText('bemvindo');
+    toast.success('Senha copiada!', { icon: '📶' }); // <-- Toast personalizado com ícone
+  };
+
+  const salvarPreferencias = () => {
+    toast.success('Preferências salvas! Nossa equipe foi notificada.', {
+      style: { background: '#c5a059', color: '#fff' } // <-- Toast premium com a cor da pousada
+    });
   };
 
   return (
@@ -71,7 +85,7 @@ export default function PortalHospede({
                 </div>
                 <QrCode size={32} className="text-on-surface" />
               </div>
-              <button onClick={() => { navigator.clipboard.writeText('bemvindo'); alert('Senha copiada!')}} className="mt-4 w-full py-2.5 rounded border text-on-surface font-label-md cursor-pointer">Copiar Senha</button>
+              <button onClick={copiarSenhaWifi} className="mt-4 w-full py-2.5 rounded border text-on-surface font-label-md cursor-pointer hover:bg-surface-container transition-colors">Copiar Senha</button>
             </div>
 
             <div className="bg-surface-container-lowest rounded-lg shadow-level-1 p-6 flex flex-col justify-between group ghost-border">
@@ -92,7 +106,7 @@ export default function PortalHospede({
                       <h4 className="font-headline-md text-lg text-on-surface">{pedido.quantidade}x {pedido.produto.nome}</h4>
                       <span className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded mt-1 inline-block">Status: {pedido.status}</span>
                    </div>
-                   <button onClick={() => cancelarPedido(pedido.id)} className="text-error bg-error-container/40 px-3 py-1.5 rounded text-xs font-bold cursor-pointer">Cancelar</button>
+                   <button onClick={() => cancelarPedido(pedido.id)} className="text-error bg-error-container/40 px-3 py-1.5 rounded text-xs font-bold cursor-pointer hover:bg-error-container">Cancelar</button>
                 </div>
               ))}
             </section>
@@ -107,7 +121,7 @@ export default function PortalHospede({
             </div>
             <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar mb-4">
               {['TODOS', 'Prato Principal', 'Petiscos', 'Bebidas', 'Sobremesas'].map((cat) => (
-                <button key={cat} onClick={() => setCategoriaFiltro(cat)} className={`px-5 py-2 rounded-full font-label-md transition-colors whitespace-nowrap cursor-pointer ${categoriaFiltro === cat ? 'bg-primary-container text-white' : 'bg-surface-container-lowest text-secondary border border-outline-variant'}`}>
+                <button key={cat} onClick={() => setCategoriaFiltro(cat)} className={`px-5 py-2 rounded-full font-label-md transition-colors whitespace-nowrap cursor-pointer ${categoriaFiltro === cat ? 'bg-primary-container text-white' : 'bg-surface-container-lowest text-secondary border border-outline-variant hover:bg-surface-container'}`}>
                   {cat === 'TODOS' ? '✨ Cardápio Completo' : cat}
                 </button>
               ))}
@@ -117,13 +131,13 @@ export default function PortalHospede({
                   const norm = (t: string) => t ? t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase() : '';
                   return norm(p.nome).includes(norm(termoBusca)) && (categoriaFiltro === 'TODOS' || p.categoria === categoriaFiltro);
                 }).map(p => (
-                 <div key={p.id} className="bg-surface-container-lowest rounded-xl shadow-level-1 p-5 ghost-border flex flex-col justify-between">
+                 <div key={p.id} className="bg-surface-container-lowest rounded-xl shadow-level-1 p-5 ghost-border flex flex-col justify-between hover:border-primary/30 transition-colors">
                   <div className="mb-4">
                     <span className="text-[10px] uppercase font-bold text-primary">{p.categoria || 'Geral'}</span>
                     <h3 className="font-headline-md text-lg text-on-surface mt-1 mb-2">{p.nome}</h3>
                     <p className="text-xl font-bold text-surface-tint">{formatarMoeda(p.preco)}</p>
                   </div>
-                  <button onClick={() => pedirComoHospede(p.id, outrasRestricoes)} className="w-full py-2.5 rounded-lg bg-surface border border-primary text-primary font-label-md flex items-center justify-center gap-2 hover:bg-primary-container hover:text-white cursor-pointer">
+                  <button onClick={() => pedirComoHospede(p.id, outrasRestricoes)} className="w-full py-2.5 rounded-lg bg-surface border border-primary text-primary font-label-md flex items-center justify-center gap-2 hover:bg-primary-container hover:text-white transition-colors cursor-pointer">
                     <ShoppingBag size={16} /> Fazer Pedido
                   </button>
                 </div>
@@ -163,7 +177,6 @@ export default function PortalHospede({
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-            {/* Card 1: Praia */}
             <div className="bg-surface-container-lowest rounded-xl shadow-level-1 overflow-hidden ghost-border flex flex-row group w-full">
               <div className="w-2/5 min-h-[160px] bg-cover bg-center flex-shrink-0" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=800')` }}></div>
               <div className="p-4 flex-1 flex flex-col justify-between">
@@ -171,11 +184,10 @@ export default function PortalHospede({
                   <h3 className="font-headline-md text-base text-on-surface mb-1">Praia de Majorlândia</h3>
                   <p className="text-[11px] text-secondary mb-3 leading-relaxed">Famosa por suas areias coloridas que inspiram o artesanato local. Mar tranquilo ao entardecer.</p>
                 </div>
-                <button className="text-primary font-bold text-xs flex items-center gap-1 hover:underline cursor-pointer mt-auto">Ver rota <ChevronRight size={14}/></button>
+                <button onClick={() => toast('Abrindo mapa...', { icon: '🗺️' })} className="text-primary font-bold text-xs flex items-center gap-1 hover:underline cursor-pointer mt-auto">Ver rota <ChevronRight size={14}/></button>
               </div>
             </div>
 
-            {/* Card 2: Buggy */}
             <div className="bg-surface-container-lowest rounded-xl shadow-level-1 overflow-hidden ghost-border flex flex-row group w-full">
               <div className="w-2/5 min-h-[160px] bg-cover bg-center flex-shrink-0" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1533561797500-4bad4728594e?q=80&w=800')` }}></div>
               <div className="p-4 flex-1 flex flex-col justify-between">
@@ -183,11 +195,10 @@ export default function PortalHospede({
                   <h3 className="font-headline-md text-base text-on-surface mb-1">Passeio de Buggy</h3>
                   <p className="text-[11px] text-secondary mb-3 leading-relaxed">Aventure-se pelas dunas douradas e descubra lagoas escondidas. Emoção garantida!</p>
                 </div>
-                <button className="text-primary font-bold text-xs flex items-center gap-1 hover:underline cursor-pointer mt-auto">Agendar passeio <ChevronRight size={14}/></button>
+                <button onClick={() => toast.success('A recepção entrará em contato para agendar!')} className="text-primary font-bold text-xs flex items-center gap-1 hover:underline cursor-pointer mt-auto">Agendar passeio <ChevronRight size={14}/></button>
               </div>
             </div>
 
-            {/* Card 3: Gastronomia */}
             <div className="bg-surface-container-lowest rounded-xl shadow-level-1 overflow-hidden ghost-border flex flex-row group w-full">
               <div className="w-2/5 min-h-[160px] bg-cover bg-center flex-shrink-0" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=800')` }}></div>
               <div className="p-4 flex-1 flex flex-col justify-between">
@@ -195,11 +206,10 @@ export default function PortalHospede({
                   <h3 className="font-headline-md text-base text-on-surface mb-1">Gastronomia Costeira</h3>
                   <p className="text-[11px] text-secondary mb-3 leading-relaxed">Saboreie peixes frescos e mariscos nas tradicionais barracas de praia à beira-mar.</p>
                 </div>
-                <button className="text-primary font-bold text-xs flex items-center gap-1 hover:underline cursor-pointer mt-auto">Ver recomendações <ChevronRight size={14}/></button>
+                <button onClick={() => document.getElementById('secao-cardapio')?.scrollIntoView({ behavior: 'smooth' })} className="text-primary font-bold text-xs flex items-center gap-1 hover:underline cursor-pointer mt-auto">Ver recomendações <ChevronRight size={14}/></button>
               </div>
             </div>
 
-            {/* Card 4: Artesanato */}
             <div className="bg-surface-container-lowest rounded-xl shadow-level-1 overflow-hidden ghost-border flex flex-row group w-full">
               <div className="w-2/5 min-h-[160px] bg-cover bg-center flex-shrink-0" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?q=80&w=800')` }}></div>
               <div className="p-4 flex-1 flex flex-col justify-between">
@@ -207,7 +217,7 @@ export default function PortalHospede({
                   <h3 className="font-headline-md text-base text-on-surface mb-1">Centro de Artesanato</h3>
                   <p className="text-[11px] text-secondary mb-3 leading-relaxed">Conheça a arte secular das garrafinhas de areia colorida feitas pelos moradores.</p>
                 </div>
-                <button className="text-primary font-bold text-xs flex items-center gap-1 hover:underline cursor-pointer mt-auto">Como chegar <ChevronRight size={14}/></button>
+                <button onClick={() => toast('Abrindo mapa...', { icon: '🗺️' })} className="text-primary font-bold text-xs flex items-center gap-1 hover:underline cursor-pointer mt-auto">Como chegar <ChevronRight size={14}/></button>
               </div>
             </div>
           </div>
@@ -222,19 +232,19 @@ export default function PortalHospede({
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between p-4 border border-outline-variant/50 rounded-lg bg-[#faf9f6]">
                     <div><h4 className="font-bold text-sm text-on-surface">Toalhas Extras</h4><p className="text-xs text-secondary mt-0.5">Jogo de banho completo</p></div>
-                    <button onClick={() => solicitarAtendimentoHospede('limpeza', 'Toalhas Extras', 'Solicitação de jogo de banho')} className="px-5 py-2.5 bg-primary-container text-primary-fixed-variant text-xs font-bold rounded-lg cursor-pointer">Solicitar</button>
+                    <button onClick={() => solicitarAtendimentoHospede('limpeza', 'Toalhas Extras', 'Solicitação de jogo de banho')} className="px-5 py-2.5 bg-primary-container text-primary-fixed-variant text-xs font-bold rounded-lg cursor-pointer hover:brightness-95 transition-all">Solicitar</button>
                 </div>
                 <div className="flex items-center justify-between p-4 border border-outline-variant/50 rounded-lg bg-[#faf9f6]">
                     <div><h4 className="font-bold text-sm text-on-surface">Reposição Frigobar</h4><p className="text-xs text-secondary mt-0.5">Água, sucos e snacks</p></div>
-                    <button onClick={() => solicitarAtendimentoHospede('limpeza', 'Reposição Frigobar', 'Água, sucos e snacks')} className="px-5 py-2.5 bg-primary-container text-primary-fixed-variant text-xs font-bold rounded-lg cursor-pointer">Solicitar</button>
+                    <button onClick={() => solicitarAtendimentoHospede('limpeza', 'Reposição Frigobar', 'Água, sucos e snacks')} className="px-5 py-2.5 bg-primary-container text-primary-fixed-variant text-xs font-bold rounded-lg cursor-pointer hover:brightness-95 transition-all">Solicitar</button>
                 </div>
                 <div className="flex items-center justify-between p-4 border border-outline-variant/50 rounded-lg bg-[#faf9f6]">
                     <div><h4 className="font-bold text-sm text-on-surface">Limpeza do Quarto</h4><p className="text-xs text-secondary mt-0.5">Arrumação e higienização</p></div>
-                    <button onClick={() => solicitarAtendimentoHospede('limpeza', 'Arrumação de Quarto', 'Limpeza solicitada')} className="px-5 py-2.5 bg-primary-container text-primary-fixed-variant text-xs font-bold rounded-lg cursor-pointer">Solicitar</button>
+                    <button onClick={() => solicitarAtendimentoHospede('limpeza', 'Arrumação de Quarto', 'Limpeza solicitada')} className="px-5 py-2.5 bg-primary-container text-primary-fixed-variant text-xs font-bold rounded-lg cursor-pointer hover:brightness-95 transition-all">Solicitar</button>
                 </div>
                 <div className="flex items-center justify-between p-4 border border-outline-variant/50 rounded-lg bg-[#faf9f6] border-l-4 border-l-error">
                     <div><h4 className="font-bold text-sm text-on-surface">Problema / Manutenção</h4><p className="text-xs text-secondary mt-0.5">Luz, ar condicionado, TV, etc.</p></div>
-                    <button onClick={() => solicitarAtendimentoHospede('reparos', 'Manutenção Necessária', 'Hóspede relatou problema')} className="px-5 py-2.5 bg-error text-white text-xs font-bold rounded-lg cursor-pointer">Solicitar</button>
+                    <button onClick={() => solicitarAtendimentoHospede('reparos', 'Manutenção Necessária', 'Hóspede relatou problema')} className="px-5 py-2.5 bg-error text-white text-xs font-bold rounded-lg cursor-pointer hover:brightness-95 transition-all">Solicitar</button>
                 </div>
               </div>
           </div>
@@ -266,7 +276,7 @@ export default function PortalHospede({
 
               <div className="flex flex-col gap-3 mt-auto">
                 <textarea rows={2} value={novaMensagemTexto} onChange={(e) => setNovaMensagemTexto(e.target.value)} placeholder="Digite sua mensagem para a recepção..." className="w-full p-3 rounded-xl border border-outline-variant bg-[#faf9f6] outline-none focus:border-primary resize-none text-sm"></textarea>
-                <button onClick={enviarMensagem} className="w-full py-3 bg-primary text-white font-label-md font-bold rounded-xl shadow-sm hover:brightness-95 cursor-pointer">
+                <button onClick={enviarMensagem} className="w-full py-3 bg-primary text-white font-label-md font-bold rounded-xl shadow-sm hover:brightness-95 cursor-pointer transition-all">
                   Enviar Mensagem
                 </button>
               </div>
@@ -274,7 +284,7 @@ export default function PortalHospede({
         </div>
       )}
 
-      {/* 4. PREFERÊNCIAS (ALINHADO À ESQUERDA E COM LARGURA TOTAL) */}
+      {/* 4. PREFERÊNCIAS */}
       {abaPortal === 'preferencias' && (
         <div className="bg-surface-container-lowest p-6 md:p-8 rounded-xl shadow-level-1 ghost-border animate-fade-in w-full mb-10">
           <h3 className="font-headline-md text-2xl mb-2 text-on-surface">Personalize sua Estadia</h3>
@@ -324,7 +334,7 @@ export default function PortalHospede({
           </div>
 
           <div className="mt-10 flex justify-end">
-             <button onClick={() => alert('Preferências salvas! Nossa equipe já foi notificada.')} className="px-8 py-3.5 bg-[#c5a059] text-white font-label-md font-bold rounded-lg hover:brightness-95 transition-all shadow-md cursor-pointer">
+             <button onClick={salvarPreferencias} className="px-8 py-3.5 bg-[#c5a059] text-white font-label-md font-bold rounded-lg hover:brightness-95 transition-all shadow-md cursor-pointer">
                Salvar Minhas Preferências
              </button>
           </div>
